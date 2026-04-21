@@ -2,8 +2,11 @@ name: Build & Release
 
 on:
   push:
-    tags:
-      - 'v*'
+    branches:
+      - main
+
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -11,6 +14,27 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Auto Version
+        id: version
+        run: |
+          # Get latest tag, default to v1.0.0 if none exists
+          LATEST=$(git tag -l 'v*' --sort=-v:refname | head -1)
+          if [ -z "$LATEST" ]; then
+            NEW_VERSION="v1.0.1"
+          else
+            # Parse major.minor.patch and bump patch
+            VERSION=${LATEST#v}
+            MAJOR=$(echo "$VERSION" | cut -d. -f1)
+            MINOR=$(echo "$VERSION" | cut -d. -f2)
+            PATCH=$(echo "$VERSION" | cut -d. -f3)
+            PATCH=$((PATCH + 1))
+            NEW_VERSION="v${MAJOR}.${MINOR}.${PATCH}"
+          fi
+          echo "version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
+          echo "📦 New version: $NEW_VERSION"
 
       - name: Install XcodeGen
         run: brew install xcodegen
@@ -34,12 +58,20 @@ jobs:
           hdiutil create -volname StatJack -srcfolder dmg_source -ov -format UDZO StatJack.dmg
           rm -rf dmg_source
 
+      - name: Create Tag
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git tag ${{ steps.version.outputs.version }}
+          git push origin ${{ steps.version.outputs.version }}
+
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ steps.version.outputs.version }}
           files: StatJack.dmg
           body: |
-            ## StatJack ${{ github.ref_name }}
+            ## StatJack ${{ steps.version.outputs.version }}
 
             ### Installation
             1. Download **StatJack.dmg** below
