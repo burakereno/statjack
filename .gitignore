@@ -1,0 +1,28 @@
+# Xcode
+*.xcodeproj/
+build/
+DerivedData/
+*.xcworkspace
+xcuserdata/
+*.xcuserstate
+
+# macOS
+.DS_Store
+*.dmg
+
+# Build artifacts
+*.app
+*.dSYM
+
+# IDE
+.vscode/
+.idea/
+
+# Temporary
+*.swp
+*.swo
+*~
+test_net*.swift
+
+# Gemini
+.gemini/
