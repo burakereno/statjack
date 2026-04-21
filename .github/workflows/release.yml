@@ -1,0 +1,55 @@
+name: Build & Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode Project
+        run: xcodegen generate
+
+      - name: Build Release
+        run: |
+          xcodebuild -project StatJack.xcodeproj \
+            -scheme StatJack \
+            -configuration Release \
+            clean build \
+            SYMROOT="${PWD}/build"
+
+      - name: Create DMG
+        run: |
+          mkdir -p dmg_source
+          cp -R build/Release/StatJack.app dmg_source/
+          ln -s /Applications dmg_source/Applications
+          hdiutil create -volname StatJack -srcfolder dmg_source -ov -format UDZO StatJack.dmg
+          rm -rf dmg_source
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: StatJack.dmg
+          body: |
+            ## StatJack ${{ github.ref_name }}
+
+            ### Installation
+            1. Download **StatJack.dmg** below
+            2. Open DMG and drag **StatJack.app** to Applications
+            3. Run in Terminal (required once for unsigned apps):
+            ```bash
+            xattr -cr /Applications/StatJack.app
+            ```
+            4. Launch StatJack — it will appear in your menu bar
+
+            ### Requirements
+            - macOS 14.0 (Sonoma) or later
+            - Apple Silicon (arm64)
