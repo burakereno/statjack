@@ -71,7 +71,7 @@ struct SettingsView: View {
                         HStack {
                             Text("StatJack")
                                 .font(.system(size: 13, weight: .bold))
-                            Text("v1.0")
+                            Text("v\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0")")
                                 .font(.system(size: 11))
                                 .foregroundStyle(.tertiary)
                         }
@@ -123,33 +123,15 @@ struct SettingsView: View {
     // MARK: - Menu Bar Preview
 
     private var menuBarPreview: some View {
-        Group {
-            if settings.iconOnly || (!settings.showCPU && !settings.showRAM && !settings.showNetwork) {
-                Image(systemName: AppIcons.app)
-                    .font(.system(size: 13))
-            } else {
-                HStack(spacing: 8) {
-                    if settings.showCPU {
-                        HStack(spacing: 3) {
-                            Image(systemName: AppIcons.cpu).font(.system(size: 10))
-                            Text(monitor.menuBarCPU).font(.system(size: 11, weight: .medium, design: .monospaced))
-                        }
-                    }
-                    if settings.showRAM {
-                        HStack(spacing: 3) {
-                            Image(systemName: AppIcons.ram).font(.system(size: 10))
-                            Text(monitor.menuBarRAM).font(.system(size: 11, weight: .medium, design: .monospaced))
-                        }
-                    }
-                    if settings.showNetwork {
-                        HStack(spacing: 3) {
-                            Image(systemName: AppIcons.network).font(.system(size: 10))
-                            Text(monitor.menuBarNet).font(.system(size: 11, weight: .medium, design: .monospaced))
-                        }
-                    }
-                }
-            }
-        }
+        MenuBarContentView(
+            iconOnly: settings.iconOnly,
+            showCPU: settings.showCPU,
+            showRAM: settings.showRAM,
+            showNetwork: settings.showNetwork,
+            cpu: monitor.menuBarCPU,
+            ram: monitor.menuBarRAM,
+            net: monitor.menuBarNet
+        )
         .foregroundStyle(.primary)
     }
 }

@@ -11,10 +11,6 @@ enum AppIcons {
     static let network = "network"
 
     // System
-    static let system = "info.circle"
-    static let battery = "battery.100percent"
-    static let disk = "internaldrive"
-    static let uptime = "clock"
     static let clock = "clock"
 
     // UI

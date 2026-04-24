@@ -21,7 +21,7 @@ final class CPUMonitor {
     @ObservationIgnored
     private var previousCPUTicks: (user: UInt64, system: UInt64, idle: UInt64, nice: UInt64)?
 
-    func update() {
+    static func sample() -> CPUSample? {
         var numCPUs: natural_t = 0
         var cpuInfo: processor_info_array_t?
         var numCPUInfo: mach_msg_type_number_t = 0
@@ -34,7 +34,7 @@ final class CPUMonitor {
             &numCPUInfo
         )
 
-        guard result == KERN_SUCCESS, let cpuInfo = cpuInfo else { return }
+        guard result == KERN_SUCCESS, let cpuInfo = cpuInfo else { return nil }
 
         defer {
             vm_deallocate(
@@ -57,11 +57,15 @@ final class CPUMonitor {
             totalNice += UInt64(cpuInfo[offset + Int(CPU_STATE_NICE)])
         }
 
+        return CPUSample(user: totalUser, system: totalSystem, idle: totalIdle, nice: totalNice)
+    }
+
+    func apply(_ sample: CPUSample) {
         if let prev = previousCPUTicks {
-            let deltaUser = totalUser - prev.user
-            let deltaSystem = totalSystem - prev.system
-            let deltaIdle = totalIdle - prev.idle
-            let deltaNice = totalNice - prev.nice
+            let deltaUser = sample.user >= prev.user ? sample.user - prev.user : 0
+            let deltaSystem = sample.system >= prev.system ? sample.system - prev.system : 0
+            let deltaIdle = sample.idle >= prev.idle ? sample.idle - prev.idle : 0
+            let deltaNice = sample.nice >= prev.nice ? sample.nice - prev.nice : 0
             let totalDelta = deltaUser + deltaSystem + deltaIdle + deltaNice
 
             if totalDelta > 0 {
@@ -71,6 +75,6 @@ final class CPUMonitor {
             }
         }
 
-        previousCPUTicks = (totalUser, totalSystem, totalIdle, totalNice)
+        previousCPUTicks = (sample.user, sample.system, sample.idle, sample.nice)
     }
 }

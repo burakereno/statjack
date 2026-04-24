@@ -10,16 +10,16 @@ import Observation
 final class MemoryMonitor {
     private(set) var memoryUsage = MemoryUsage(total: 0, used: 0, active: 0, wired: 0, compressed: 0, free: 0)
 
-    private let totalMemory: UInt64 = {
+    private static let totalMemory: UInt64 = {
         var size: UInt64 = 0
         var len = MemoryLayout<UInt64>.size
         sysctlbyname("hw.memsize", &size, &len, nil, 0)
         return size
     }()
 
-    private let pageSize: UInt64 = UInt64(vm_kernel_page_size)
+    private static let pageSize: UInt64 = UInt64(vm_kernel_page_size)
 
-    func update() {
+    static func sample() -> MemoryUsage? {
         var stats = vm_statistics64()
         var count = mach_msg_type_number_t(MemoryLayout<vm_statistics64>.size / MemoryLayout<integer_t>.size)
 
@@ -29,21 +29,25 @@ final class MemoryMonitor {
             }
         }
 
-        guard result == KERN_SUCCESS else { return }
+        guard result == KERN_SUCCESS else { return nil }
 
-        let active = UInt64(stats.active_count) * pageSize
-        let wired = UInt64(stats.wire_count) * pageSize
-        let compressed = UInt64(stats.compressor_page_count) * pageSize
-        let free = UInt64(stats.free_count) * pageSize
+        let active = UInt64(stats.active_count) * Self.pageSize
+        let wired = UInt64(stats.wire_count) * Self.pageSize
+        let compressed = UInt64(stats.compressor_page_count) * Self.pageSize
+        let free = UInt64(stats.free_count) * Self.pageSize
         let used = active + wired + compressed
 
-        memoryUsage = MemoryUsage(
-            total: totalMemory,
+        return MemoryUsage(
+            total: Self.totalMemory,
             used: used,
             active: active,
             wired: wired,
             compressed: compressed,
             free: free
         )
+    }
+
+    func apply(_ usage: MemoryUsage) {
+        memoryUsage = usage
     }
 }

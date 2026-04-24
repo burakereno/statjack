@@ -15,34 +15,48 @@ final class NetworkMonitor {
     @ObservationIgnored
     private var previousSnapshot: (bytesIn: UInt64, bytesOut: UInt64, timestamp: TimeInterval)?
 
+    /// First usable counters in this process, for session totals.
+    @ObservationIgnored
+    private var baselineSnapshot: (bytesIn: UInt64, bytesOut: UInt64)?
+
     // MARK: - Update
 
-    func update() {
-        let currentTimestamp = CFAbsoluteTimeGetCurrent()
+    static func sample() -> NetworkSample {
         let (totalIn, totalOut) = getInterfaceBytes()
+        return NetworkSample(
+            bytesIn: totalIn,
+            bytesOut: totalOut,
+            timestamp: CFAbsoluteTimeGetCurrent()
+        )
+    }
 
+    func apply(_ sample: NetworkSample) {
         if let prev = previousSnapshot {
-            let deltaIn = totalIn >= prev.bytesIn ? totalIn - prev.bytesIn : 0
-            let deltaOut = totalOut >= prev.bytesOut ? totalOut - prev.bytesOut : 0
-            let deltaTime = currentTimestamp - prev.timestamp
+            let deltaIn = sample.bytesIn >= prev.bytesIn ? sample.bytesIn - prev.bytesIn : 0
+            let deltaOut = sample.bytesOut >= prev.bytesOut ? sample.bytesOut - prev.bytesOut : 0
+            let deltaTime = sample.timestamp - prev.timestamp
+            let baseline = baselineSnapshot ?? (prev.bytesIn, prev.bytesOut)
+            baselineSnapshot = baseline
 
             if deltaTime > 0 {
                 networkUsage = NetworkUsage(
                     uploadSpeed: Double(deltaOut) / deltaTime,
                     downloadSpeed: Double(deltaIn) / deltaTime,
-                    totalUploaded: totalOut,
-                    totalDownloaded: totalIn
+                    totalUploaded: sample.bytesOut >= baseline.bytesOut ? sample.bytesOut - baseline.bytesOut : 0,
+                    totalDownloaded: sample.bytesIn >= baseline.bytesIn ? sample.bytesIn - baseline.bytesIn : 0
                 )
             }
+        } else {
+            baselineSnapshot = (sample.bytesIn, sample.bytesOut)
         }
 
-        previousSnapshot = (totalIn, totalOut, currentTimestamp)
+        previousSnapshot = (sample.bytesIn, sample.bytesOut, sample.timestamp)
     }
 
     // MARK: - getifaddrs
 
     /// Returns total (bytesIn, bytesOut) across all non-loopback interfaces
-    private func getInterfaceBytes() -> (UInt64, UInt64) {
+    private static func getInterfaceBytes() -> (UInt64, UInt64) {
         var totalIn: UInt64 = 0
         var totalOut: UInt64 = 0
 
@@ -54,12 +68,18 @@ final class NetworkMonitor {
         while let current = ptr {
             let addr = current.pointee
 
-            // Only look at AF_LINK (link-layer) addresses
             if let sa = addr.ifa_addr, sa.pointee.sa_family == UInt8(AF_LINK) {
                 let name = String(cString: addr.ifa_name)
+                let flags = Int32(addr.ifa_flags)
+                let isUsable = (flags & IFF_UP) != 0
+                    && (flags & IFF_RUNNING) != 0
+                    && (flags & IFF_LOOPBACK) == 0
+                    && !name.hasPrefix("awdl")
+                    && !name.hasPrefix("llw")
+                    && !name.hasPrefix("bridge")
+                    && !name.hasPrefix("utun")
 
-                // Skip loopback
-                if name != "lo0", let data = addr.ifa_data {
+                if isUsable, let data = addr.ifa_data {
                     let networkData = data.assumingMemoryBound(to: if_data.self)
                     totalIn += UInt64(networkData.pointee.ifi_ibytes)
                     totalOut += UInt64(networkData.pointee.ifi_obytes)

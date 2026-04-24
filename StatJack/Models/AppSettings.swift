@@ -4,7 +4,7 @@ import Observation
 extension Notification.Name {
     /// Posted whenever any menu-bar-visibility setting changes. AppDelegate
     /// listens for this so the status item updates immediately instead of
-    /// waiting for the next 3-second tick.
+    /// waiting for the next monitoring tick.
     static let statJackSettingsChanged = Notification.Name("StatJackSettingsChanged")
 }
 

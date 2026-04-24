@@ -8,10 +8,10 @@
 
 ## Features
 
-- 📊 **Real-time CPU usage** — total usage percentage + top 5 processes
+- 📊 **Real-time CPU usage** — total usage percentage with user/system split
 - 🧠 **Memory monitoring** — used/total RAM with breakdown (active, wired, compressed)
 - 🌐 **Network speed** — live upload/download speeds + session totals
-- ⚡ **Minimal resource usage** — cache-gated rendering, near 0% CPU when idle
+- ⚡ **Minimal resource usage** — adaptive polling with hidden metrics skipped while idle
 - 🎛️ **Configurable** — toggle which metrics appear in the menu bar
 - 🖥️ **Native macOS** — built with SwiftUI + AppKit, runs as a menu bar app
 

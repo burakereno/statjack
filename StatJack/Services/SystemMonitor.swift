@@ -22,10 +22,19 @@ final class SystemMonitor {
     private var timer: Timer?
     @ObservationIgnored
     private var currentInterval: TimeInterval = 0
+    @ObservationIgnored
+    private var collectAllMetrics = false
+    @ObservationIgnored
+    private var isUpdating = false
+    @ObservationIgnored
+    private var pendingRefresh = false
+    @ObservationIgnored
+    private let sampleQueue = DispatchQueue(label: "com.statjack.monitor.samples", qos: .utility)
+    @ObservationIgnored
+    private let bootDate: Date?
 
     init() {
-        // Do an initial synchronous update so the menu bar has real values
-        // on the first paint instead of the placeholder "0%".
+        bootDate = Self.loadBootDate()
         tick()
         startMonitoring(interval: 5.0)
     }
@@ -37,9 +46,12 @@ final class SystemMonitor {
     /// Starts (or reschedules) the repeating update timer at the given
     /// interval. Callers pass a slower interval when the popover is closed
     /// and a faster one while it's open.
-    func startMonitoring(interval: TimeInterval) {
-        guard currentInterval != interval || timer == nil else { return }
+    func startMonitoring(interval: TimeInterval, collectAllMetrics: Bool = false) {
+        guard currentInterval != interval
+            || self.collectAllMetrics != collectAllMetrics
+            || timer == nil else { return }
         currentInterval = interval
+        self.collectAllMetrics = collectAllMetrics
 
         timer?.invalidate()
         let timer = Timer(timeInterval: interval, repeats: true) { [weak self] _ in
@@ -53,42 +65,95 @@ final class SystemMonitor {
         timer?.invalidate()
         timer = nil
         currentInterval = 0
+        pendingRefresh = false
+    }
+
+    func refreshNow() {
+        tick()
     }
 
     /// One monitoring tick. Heavy work (the three Mach/sysctl calls) is kept
     /// off the main thread; observed properties are written back on main.
     private func tick() {
-        DispatchQueue.global(qos: .utility).async { [weak self] in
-            guard let self else { return }
+        guard !isUpdating else {
+            pendingRefresh = true
+            return
+        }
+        isUpdating = true
 
-            self.cpuMonitor.update()
-            self.memoryMonitor.update()
-            self.networkMonitor.update()
+        let selection = metricSelection()
+        guard selection.cpu || selection.memory || selection.network else {
+            updateUptime()
+            isUpdating = false
+            runPendingRefreshIfNeeded()
+            return
+        }
 
-            let cpuText = "\(Int(self.cpuMonitor.totalUsage))%"
-            let ramText = "\(Int(self.memoryMonitor.memoryUsage.usedPercentage))%"
-            let up = Formatters.formatSpeedCompact(self.networkMonitor.networkUsage.uploadSpeed)
-            let down = Formatters.formatSpeedCompact(self.networkMonitor.networkUsage.downloadSpeed)
-            let netText = "↑\(up) ↓\(down)"
+        sampleQueue.async { [weak self] in
+            let sample = SystemSample(
+                cpu: selection.cpu ? CPUMonitor.sample() : nil,
+                memory: selection.memory ? MemoryMonitor.sample() : nil,
+                network: selection.network ? NetworkMonitor.sample() : nil
+            )
 
-            DispatchQueue.main.async {
-                self.updateUptime()
-                self.menuBarCPU = cpuText
-                self.menuBarRAM = ramText
-                self.menuBarNet = netText
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                self.apply(sample)
+                self.isUpdating = false
                 NotificationCenter.default.post(name: .statJackValuesChanged, object: self)
+                self.runPendingRefreshIfNeeded()
             }
         }
     }
 
+    private func runPendingRefreshIfNeeded() {
+        guard pendingRefresh else { return }
+        pendingRefresh = false
+        tick()
+    }
+
+    private func metricSelection() -> (cpu: Bool, memory: Bool, network: Bool) {
+        guard !collectAllMetrics else { return (true, true, true) }
+
+        let settings = AppSettings.shared
+        guard !settings.iconOnly else { return (false, false, false) }
+        return (settings.showCPU, settings.showRAM, settings.showNetwork)
+    }
+
+    private func apply(_ sample: SystemSample) {
+        if let cpu = sample.cpu {
+            cpuMonitor.apply(cpu)
+            menuBarCPU = "\(Int(cpuMonitor.totalUsage))%"
+        }
+
+        if let memory = sample.memory {
+            memoryMonitor.apply(memory)
+            menuBarRAM = "\(Int(memoryMonitor.memoryUsage.usedPercentage))%"
+        }
+
+        if let network = sample.network {
+            networkMonitor.apply(network)
+            let up = Formatters.formatSpeedCompact(networkMonitor.networkUsage.uploadSpeed)
+            let down = Formatters.formatSpeedCompact(networkMonitor.networkUsage.downloadSpeed)
+            menuBarNet = "↑\(up) ↓\(down)"
+        }
+
+        updateUptime()
+    }
+
     private func updateUptime() {
+        guard let bootDate else { return }
+        uptime = Date().timeIntervalSince(bootDate)
+    }
+
+    private static func loadBootDate() -> Date? {
         var boottime = timeval()
         var size = MemoryLayout<timeval>.size
         var mib: [Int32] = [CTL_KERN, KERN_BOOTTIME]
         if sysctl(&mib, 2, &boottime, &size, nil, 0) == 0 {
-            let bootDate = Date(timeIntervalSince1970: TimeInterval(boottime.tv_sec))
-            uptime = Date().timeIntervalSince(bootDate)
+            return Date(timeIntervalSince1970: TimeInterval(boottime.tv_sec))
         }
+        return nil
     }
 }
 

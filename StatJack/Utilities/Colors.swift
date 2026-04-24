@@ -29,17 +29,4 @@ enum AppColors {
 
     /// Separator color
     static let separator = Color(nsColor: .separatorColor)
-
-    /// Tab bar colors
-    static let tabActive = Color.accentColor
-    static let tabInactive = Color.secondary.opacity(0.5)
-
-    /// Process rank indicator colors
-    static let rankColors: [Color] = [
-        .green,
-        .blue,
-        .orange,
-        .purple,
-        Color(nsColor: .systemGray)
-    ]
 }

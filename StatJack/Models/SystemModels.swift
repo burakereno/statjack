@@ -30,3 +30,25 @@ struct NetworkUsage {
         Formatters.formatBytesPerSecond(downloadSpeed)
     }
 }
+
+/// Raw CPU counters sampled off the main thread, then applied on main.
+struct CPUSample {
+    let user: UInt64
+    let system: UInt64
+    let idle: UInt64
+    let nice: UInt64
+}
+
+/// Raw network counters sampled off the main thread, then applied on main.
+struct NetworkSample {
+    let bytesIn: UInt64
+    let bytesOut: UInt64
+    let timestamp: TimeInterval
+}
+
+/// Optional samples collected during one monitoring tick.
+struct SystemSample {
+    let cpu: CPUSample?
+    let memory: MemoryUsage?
+    let network: NetworkSample?
+}
