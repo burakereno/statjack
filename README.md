@@ -1,7 +1,7 @@
 # StatJack
 
 <p align="center">
-  <img src="statjack.png" alt="StatJack" width="128" height="128">
+  <img src="statjack.png" alt="StatJack" width="240" height="240">
 </p>
 
 **Lightweight macOS menu bar system monitor.** Track CPU, RAM, and Network usage at a glance — right from your menu bar.
