@@ -20,4 +20,5 @@ enum AppIcons {
     static let preview = "eye"
     static let about = "info.circle"
     static let menuBar = "rectangle.topthird.inset.filled"
+    static let dock = "dock.rectangle"
 }

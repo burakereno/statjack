@@ -116,8 +116,9 @@ final class SystemMonitor {
         guard !collectAllMetrics else { return (true, true, true) }
 
         let settings = AppSettings.shared
-        guard !settings.iconOnly else { return (false, false, false) }
-        return (settings.showCPU, settings.showRAM, settings.showNetwork)
+        let needsDockCPU = settings.showDockIcon && settings.showDockBadge
+        guard !settings.iconOnly else { return (needsDockCPU, false, false) }
+        return (settings.showCPU || needsDockCPU, settings.showRAM, settings.showNetwork)
     }
 
     private func apply(_ sample: SystemSample) {

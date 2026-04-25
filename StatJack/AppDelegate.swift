@@ -9,6 +9,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     private var monitor: SystemMonitor!
     private var eventMonitor: Any?
     private var lastMenuBarState: MenuBarState?
+    private var currentActivationPolicy: NSApplication.ActivationPolicy?
 
     private let idleInterval: TimeInterval = 5.0
     private let activeInterval: TimeInterval = 2.0
@@ -18,13 +19,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         let showCPU: Bool
         let showRAM: Bool
         let showNetwork: Bool
-        let title: String
+        let segments: [MenuBarMetricSegment]
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        NSApp.setActivationPolicy(.accessory)
-
         monitor = SystemMonitor()
+        applyActivationPolicy()
 
         popover = NSPopover()
         popover.behavior = .transient
@@ -41,6 +41,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             button.action = #selector(togglePopover(_:))
             button.target = self
             updateMenuBarButton()
+            updateDockBadge()
         }
 
         let center = NotificationCenter.default
@@ -56,12 +57,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     }
 
     @objc private func settingsChanged() {
+        applyActivationPolicy()
         updateMonitoringMode()
         monitor.refreshNow()
         updateMenuBarButton()
+        updateDockBadge()
     }
 
-    @objc private func valuesChanged() { updateMenuBarButton() }
+    @objc private func valuesChanged() {
+        updateMenuBarButton()
+        updateDockBadge()
+    }
 
     // MARK: - Popover
 
@@ -73,10 +79,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         } else {
             monitor.startMonitoring(interval: activeInterval, collectAllMetrics: true)
             monitor.refreshNow()
+            NSApp.activate(ignoringOtherApps: true)
             popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
             button.highlight(true)
-            NSApp.activate(ignoringOtherApps: true)
+            focusPopoverWindow()
             startEventMonitor()
+        }
+    }
+
+    private func focusPopoverWindow() {
+        Task { @MainActor [weak self] in
+            guard let self, self.popover.isShown else { return }
+            self.popover.contentViewController?.view.window?.makeKeyAndOrderFront(nil)
         }
     }
 
@@ -118,6 +132,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         )
     }
 
+    private func applyActivationPolicy() {
+        let policy: NSApplication.ActivationPolicy = AppSettings.shared.showDockIcon ? .regular : .accessory
+        guard currentActivationPolicy != policy else { return }
+
+        NSApp.setActivationPolicy(policy)
+        currentActivationPolicy = policy
+
+        if policy == .regular {
+            NSApp.activate(ignoringOtherApps: true)
+        }
+    }
+
+    private func updateDockBadge() {
+        let settings = AppSettings.shared
+        guard settings.showDockIcon && settings.showDockBadge else {
+            NSApp.dockTile.badgeLabel = nil
+            return
+        }
+
+        NSApp.dockTile.badgeLabel = monitor.menuBarCPU
+    }
+
     // MARK: - Update Menu Bar
 
     func updateMenuBarButton() {
@@ -129,56 +165,103 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         guard let button = statusItem.button else { return }
 
         let settings = AppSettings.shared
-        let showIconOnly = settings.iconOnly
-            || (!settings.showCPU && !settings.showRAM && !settings.showNetwork)
-
-        var segments: [String] = []
-        if settings.showCPU { segments.append(monitor.menuBarCPU) }
-        if settings.showRAM { segments.append(monitor.menuBarRAM) }
-        if settings.showNetwork { segments.append(monitor.menuBarNet) }
-        let title = showIconOnly ? "" : segments.joined(separator: "  ")
+        let showIconOnly = MenuBarDisplay.showIconOnly(
+            iconOnly: settings.iconOnly,
+            showCPU: settings.showCPU,
+            showRAM: settings.showRAM,
+            showNetwork: settings.showNetwork
+        )
+        let segments = MenuBarDisplay.metricSegments(
+            iconOnly: settings.iconOnly,
+            showCPU: settings.showCPU,
+            showRAM: settings.showRAM,
+            showNetwork: settings.showNetwork,
+            cpu: monitor.menuBarCPU,
+            ram: monitor.menuBarRAM,
+            net: monitor.menuBarNet
+        )
         let state = MenuBarState(
             iconOnly: showIconOnly,
             showCPU: settings.showCPU,
             showRAM: settings.showRAM,
             showNetwork: settings.showNetwork,
-            title: title
+            segments: segments
         )
 
         guard state != lastMenuBarState else { return }
         lastMenuBarState = state
 
-        if showIconOnly || title.isEmpty {
+        if showIconOnly || segments.isEmpty {
+            statusItem.length = NSStatusItem.squareLength
             button.image = NSImage(systemSymbolName: AppIcons.app,
                                    accessibilityDescription: "StatJack")
+            button.image?.isTemplate = true
             button.imagePosition = .imageOnly
             button.title = ""
         } else {
-            let image = renderStatusImage(text: title)
+            let image = renderStatusImage(segments: segments)
+            statusItem.length = image.size.width
             button.image = image
             button.imagePosition = .imageOnly
             button.title = ""
         }
     }
 
-    /// Draw text into a template NSImage suitable for the menu bar.
-    /// Always produces a valid image — never returns nil.
-    private func renderStatusImage(text: String) -> NSImage {
-        let font = NSFont.monospacedSystemFont(ofSize: 13, weight: .medium)
-        let attrs: [NSAttributedString.Key: Any] = [.font: font]
-        let textSize = (text as NSString).size(withAttributes: attrs)
-        let w = ceil(textSize.width) + 6
-        let h: CGFloat = 20
+    /// Draws the same fixed-width icon + value segments used by the settings
+    /// preview, preventing the status item from resizing on every network tick.
+    private func renderStatusImage(segments: [MenuBarMetricSegment]) -> NSImage {
+        let w = MenuBarDisplay.contentWidth(for: segments)
+        let h = MenuBarDisplay.statusHeight
+        let font = NSFont.monospacedSystemFont(
+            ofSize: MenuBarDisplay.metricTextPointSize,
+            weight: .medium
+        )
+        let attrs: [NSAttributedString.Key: Any] = [
+            .font: font,
+            .foregroundColor: NSColor.black
+        ]
 
         let image = NSImage(size: NSSize(width: w, height: h))
         image.lockFocus()
-        let drawRect = NSRect(x: 3,
-                              y: (h - textSize.height) / 2,
-                              width: textSize.width,
-                              height: textSize.height)
-        (text as NSString).draw(in: drawRect, withAttributes: attrs)
+        NSColor.clear.setFill()
+        NSRect(x: 0, y: 0, width: w, height: h).fill()
+
+        var x = MenuBarDisplay.horizontalPadding
+        for segment in segments {
+            drawSymbol(segment.symbolName, x: x, canvasHeight: h)
+
+            let textX = x + MenuBarDisplay.metricIconWidth + MenuBarDisplay.iconTextSpacing
+            let textSize = (segment.text as NSString).size(withAttributes: attrs)
+            let textY = floor((h - textSize.height) / 2)
+            (segment.text as NSString).draw(
+                at: NSPoint(x: textX, y: textY),
+                withAttributes: attrs
+            )
+            x += segment.width + MenuBarDisplay.segmentSpacing
+        }
+
         image.unlockFocus()
         image.isTemplate = true
         return image
+    }
+
+    private func drawSymbol(_ symbolName: String, x: CGFloat, canvasHeight: CGFloat) {
+        let config = NSImage.SymbolConfiguration(
+            pointSize: MenuBarDisplay.metricIconPointSize,
+            weight: .medium
+        )
+        guard let symbol = NSImage(
+            systemSymbolName: symbolName,
+            accessibilityDescription: nil
+        )?.withSymbolConfiguration(config) else { return }
+
+        let symbolSize = symbol.size
+        let rect = NSRect(
+            x: x + (MenuBarDisplay.metricIconWidth - symbolSize.width) / 2,
+            y: (canvasHeight - symbolSize.height) / 2,
+            width: symbolSize.width,
+            height: symbolSize.height
+        )
+        symbol.draw(in: rect)
     }
 }

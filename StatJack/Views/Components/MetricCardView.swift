@@ -5,6 +5,7 @@ struct MetricCardView<Content: View>: View {
     let title: String
     let systemImage: String
     let content: () -> Content
+    @Environment(\.colorScheme) private var colorScheme
 
     init(title: String, systemImage: String, @ViewBuilder content: @escaping () -> Content) {
         self.title = title
@@ -18,11 +19,11 @@ struct MetricCardView<Content: View>: View {
             HStack(spacing: 6) {
                 Image(systemName: systemImage)
                     .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(headerForeground)
                     .frame(width: 14, alignment: .center)
                 Text(title)
                     .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(headerForeground)
                     .textCase(.uppercase)
                     .tracking(0.5)
             }
@@ -32,7 +33,38 @@ struct MetricCardView<Content: View>: View {
         .padding(12)
         .background {
             RoundedRectangle(cornerRadius: 10)
-                .fill(AppColors.cardBackground.opacity(0.5))
+                .fill(cardFill)
+                .overlay {
+                    RoundedRectangle(cornerRadius: 10)
+                        .stroke(cardHighlight, lineWidth: 0.5)
+                }
+                .shadow(color: cardShadow, radius: 8, y: 2)
         }
     }
+
+    private var cardFill: Color {
+        if colorScheme == .dark {
+            return Color.black.opacity(0.16)
+        }
+        return Color.black.opacity(0.03)
+    }
+
+    private var cardHighlight: Color {
+        if colorScheme == .dark {
+            return Color.white.opacity(0.07)
+        }
+        return Color.black.opacity(0.045)
+    }
+
+    private var cardShadow: Color {
+        colorScheme == .dark ? Color.black.opacity(0.32) : Color.black.opacity(0.065)
+    }
+
+    private var headerForeground: Color {
+        if colorScheme == .dark {
+            return Color(nsColor: .secondaryLabelColor)
+        }
+        return Color(nsColor: .tertiaryLabelColor)
+    }
+
 }

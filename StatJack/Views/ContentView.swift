@@ -5,6 +5,10 @@ struct ContentView: View {
     let monitor: SystemMonitor
     @State private var showSettings = false
 
+    private var appVersion: String {
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             // Header
@@ -12,26 +16,39 @@ struct ContentView: View {
 
             Divider().opacity(0.5)
 
-            if showSettings {
-                ScrollView {
-                    SettingsView(monitor: monitor)
+            ZStack {
+                if showSettings {
+                    ScrollView {
+                        SettingsView(monitor: monitor)
+                            .padding(.horizontal, 12)
+                            .padding(.top, 10)
+                            .padding(.bottom, 12)
+                    }
+                    .transition(.asymmetric(
+                        insertion: .move(edge: .trailing).combined(with: .opacity),
+                        removal: .move(edge: .trailing).combined(with: .opacity)
+                    ))
+                } else {
+                    // All stats in one scroll
+                    ScrollView {
+                        VStack(spacing: 10) {
+                            CPUView(monitor: monitor)
+                            MemoryView(monitor: monitor)
+                            NetworkView(monitor: monitor)
+                        }
                         .padding(.horizontal, 12)
                         .padding(.top, 10)
                         .padding(.bottom, 12)
-                }
-            } else {
-                // All stats in one scroll
-                ScrollView {
-                    VStack(spacing: 10) {
-                        CPUView(monitor: monitor)
-                        MemoryView(monitor: monitor)
-                        NetworkView(monitor: monitor)
                     }
-                    .padding(.horizontal, 12)
-                    .padding(.top, 10)
-                    .padding(.bottom, 12)
+                    .transition(.asymmetric(
+                        insertion: .move(edge: .leading).combined(with: .opacity),
+                        removal: .move(edge: .leading).combined(with: .opacity)
+                    ))
                 }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .clipped()
+            .animation(.snappy(duration: 0.24), value: showSettings)
 
             Divider().opacity(0.5)
 
@@ -55,11 +72,14 @@ struct ContentView: View {
             Spacer()
 
             Button(action: {
-                showSettings.toggle()
+                withAnimation(.snappy(duration: 0.24)) {
+                    showSettings.toggle()
+                }
             }) {
                 Image(systemName: showSettings ? AppIcons.close : AppIcons.settings)
                     .font(.system(size: 14))
                     .foregroundStyle(showSettings ? .primary : .secondary)
+                    .contentTransition(.symbolEffect(.replace))
             }
             .buttonStyle(.plain)
             .onHover { hovering in
@@ -84,6 +104,10 @@ struct ContentView: View {
                 .foregroundStyle(.tertiary)
 
             Spacer()
+
+            Text("Version \(appVersion)")
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(.secondary)
 
             Button(action: {
                 NSApplication.shared.terminate(nil)

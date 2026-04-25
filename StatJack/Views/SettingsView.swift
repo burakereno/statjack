@@ -5,8 +5,38 @@ struct SettingsView: View {
     let monitor: SystemMonitor
     @Bindable var settings = AppSettings.shared
 
+    private var appVersion: String {
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
+    }
+
+    private var buildNumber: String {
+        Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
+    }
+
     var body: some View {
         VStack(spacing: 12) {
+            // App Behavior
+            MetricCardView(title: "App Behavior", systemImage: AppIcons.dock) {
+                VStack(spacing: 0) {
+                    toggleRow(
+                        title: "Dock Icon",
+                        subtitle: "Show StatJack in the Dock",
+                        icon: AppIcons.dock,
+                        isOn: $settings.showDockIcon
+                    )
+
+                    Divider().opacity(0.2).padding(.vertical, 2)
+
+                    toggleRow(
+                        title: "CPU Badge",
+                        subtitle: "Show CPU percentage on the Dock icon",
+                        icon: AppIcons.cpu,
+                        isOn: $settings.showDockBadge,
+                        disabled: !settings.showDockIcon
+                    )
+                }
+            }
+
             // Menu Bar Display
             MetricCardView(title: "Menu Bar Display", systemImage: AppIcons.menuBar) {
                 VStack(spacing: 0) {
@@ -71,9 +101,9 @@ struct SettingsView: View {
                         HStack {
                             Text("StatJack")
                                 .font(.system(size: 13, weight: .bold))
-                            Text("v\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0")")
-                                .font(.system(size: 11))
-                                .foregroundStyle(.tertiary)
+                            Text("Version \(appVersion) (Build \(buildNumber))")
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundStyle(.secondary)
                         }
                         Text("Lightweight system monitor for macOS")
                             .font(.system(size: 11))

@@ -55,20 +55,25 @@ enum Formatters {
         return String(format: "%.0f B/s", bytesPerSecond)
     }
 
-    /// Format speed for menu bar (compact). Always returns 2–4 characters so the
-    /// status item width stays stable between updates.
+    /// Format speed for menu bar (compact). The numeric part is capped at two
+    /// digits per unit so network segments stay readable in tight menu-bar space.
     static func formatSpeedCompact(_ bytesPerSecond: Double) -> String {
         let kbps = bytesPerSecond / 1_024
         let mbps = kbps / 1_024
+        let gbps = mbps / 1_024
 
-        if mbps >= 10 {
-            return String(format: "%.0fM", mbps)
+        if gbps >= 1 {
+            return "\(cappedTwoDigitSpeed(gbps))G"
         } else if mbps >= 1 {
-            return String(format: "%.1fM", mbps)
+            return "\(cappedTwoDigitSpeed(mbps))M"
         } else if kbps >= 1 {
-            return String(format: "%.0fK", kbps)
+            return "\(cappedTwoDigitSpeed(kbps))K"
         }
         return "0K"
+    }
+
+    private static func cappedTwoDigitSpeed(_ value: Double) -> Int {
+        min(99, max(1, Int(value.rounded())))
     }
 
     // MARK: - Time Formatting
