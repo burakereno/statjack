@@ -129,6 +129,7 @@ struct SettingsView: View {
 
             Toggle("", isOn: isOn)
                 .toggleStyle(.switch)
+                .controlSize(.large)
                 .labelsHidden()
                 .disabled(disabled)
         }
