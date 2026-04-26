@@ -97,7 +97,7 @@ final class UpdateChecker {
                 try? FileManager.default.removeItem(at: dest)
                 do {
                     try FileManager.default.moveItem(at: tmpURL, to: dest)
-                    NSWorkspace.shared.open(dest)
+                    self.installUpdate(dmgURL: dest)
                 } catch {
                     self.lastError = error.localizedDescription
                 }
@@ -114,6 +114,126 @@ final class UpdateChecker {
     }
 
     private var progressObservation: NSKeyValueObservation?
+
+    // MARK: - Install
+
+    private func installUpdate(dmgURL: URL) {
+        let currentBundle = URL(fileURLWithPath: Bundle.main.bundlePath)
+
+        // Dev builds run from DerivedData — skip auto-install, just open the dmg
+        guard currentBundle.path.hasPrefix("/Applications/") else {
+            NSWorkspace.shared.open(dmgURL)
+            return
+        }
+
+        Task.detached { [weak self] in
+            guard let self else { return }
+
+            guard let mountPoint = Self.mount(dmgURL) else {
+                await MainActor.run {
+                    self.lastError = "Failed to mount disk image"
+                    NSWorkspace.shared.open(dmgURL)
+                }
+                return
+            }
+
+            let mountedApp = URL(fileURLWithPath: mountPoint)
+                .appendingPathComponent("StatJack.app")
+
+            guard FileManager.default.fileExists(atPath: mountedApp.path) else {
+                Self.detach(mountPoint)
+                await MainActor.run {
+                    self.lastError = "StatJack.app not found in DMG"
+                    NSWorkspace.shared.open(dmgURL)
+                }
+                return
+            }
+
+            let backup = URL(fileURLWithPath: NSTemporaryDirectory())
+                .appendingPathComponent("StatJack.old.\(UUID().uuidString).app")
+
+            do {
+                try FileManager.default.moveItem(at: currentBundle, to: backup)
+            } catch {
+                Self.detach(mountPoint)
+                await MainActor.run {
+                    self.lastError = "Cannot replace app: \(error.localizedDescription). Try drag-installing manually."
+                    NSWorkspace.shared.open(dmgURL)
+                }
+                return
+            }
+
+            do {
+                try FileManager.default.copyItem(at: mountedApp, to: currentBundle)
+            } catch {
+                try? FileManager.default.moveItem(at: backup, to: currentBundle)
+                Self.detach(mountPoint)
+                await MainActor.run {
+                    self.lastError = "Install failed: \(error.localizedDescription)"
+                    NSWorkspace.shared.open(dmgURL)
+                }
+                return
+            }
+
+            Self.runProcess("/usr/bin/xattr", ["-cr", currentBundle.path])
+            Self.detach(mountPoint)
+
+            await MainActor.run {
+                let config = NSWorkspace.OpenConfiguration()
+                config.createsNewApplicationInstance = true
+                NSWorkspace.shared.openApplication(at: currentBundle, configuration: config) { _, _ in
+                    Task { @MainActor in
+                        NSApp.terminate(nil)
+                    }
+                }
+            }
+        }
+    }
+
+    nonisolated private static func mount(_ url: URL) -> String? {
+        let task = Process()
+        task.launchPath = "/usr/bin/hdiutil"
+        task.arguments = ["attach", "-nobrowse", "-noautoopen", "-quiet", "-plist", url.path]
+        let out = Pipe()
+        task.standardOutput = out
+        task.standardError = Pipe()
+
+        do {
+            try task.run()
+            task.waitUntilExit()
+        } catch {
+            return nil
+        }
+        guard task.terminationStatus == 0 else { return nil }
+
+        let data = out.fileHandleForReading.readDataToEndOfFile()
+        guard
+            let plist = try? PropertyListSerialization.propertyList(
+                from: data, options: [], format: nil
+            ) as? [String: Any],
+            let entities = plist["system-entities"] as? [[String: Any]]
+        else { return nil }
+
+        return entities.compactMap { $0["mount-point"] as? String }.first
+    }
+
+    nonisolated private static func detach(_ mountPoint: String) {
+        runProcess("/usr/bin/hdiutil", ["detach", mountPoint, "-quiet", "-force"])
+    }
+
+    @discardableResult
+    nonisolated private static func runProcess(_ path: String, _ args: [String]) -> Int32 {
+        let task = Process()
+        task.launchPath = path
+        task.arguments = args
+        do {
+            try task.run()
+            task.waitUntilExit()
+            return task.terminationStatus
+        } catch {
+            return -1
+        }
+    }
 
     // MARK: - Semver compare
 
