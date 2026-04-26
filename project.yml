@@ -23,8 +23,8 @@ targets:
       path: StatJack/Info.plist
       properties:
         LSUIElement: true
-        CFBundleShortVersionString: "1.0.8"
-        CFBundleVersion: "8"
+        CFBundleShortVersionString: "1.0.9"
+        CFBundleVersion: "9"
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.statjack.app
