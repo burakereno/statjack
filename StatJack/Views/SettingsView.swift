@@ -129,11 +129,21 @@ struct SettingsView: View {
 
             Toggle("", isOn: isOn)
                 .toggleStyle(.switch)
-                .controlSize(.regular)
+                .controlSize(.mini)
                 .labelsHidden()
                 .disabled(disabled)
+                .allowsHitTesting(false)
         }
         .padding(.vertical, 4)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            guard !disabled else { return }
+            isOn.wrappedValue.toggle()
+        }
+        .onHover { hovering in
+            if hovering && !disabled { NSCursor.pointingHand.push() }
+            else { NSCursor.pop() }
+        }
     }
 
 }

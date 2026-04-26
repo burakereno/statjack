@@ -83,13 +83,10 @@ enum Formatters {
         let totalSeconds = Int(seconds)
         let days = totalSeconds / 86400
         let hours = (totalSeconds % 86400) / 3600
-        let minutes = (totalSeconds % 3600) / 60
 
-        var parts: [String] = []
-        if days > 0 { parts.append("\(days)d") }
-        if hours > 0 { parts.append("\(hours)h") }
-        parts.append("\(minutes)m")
-
-        return parts.joined(separator: " ")
+        if days > 0 {
+            return "\(days)d \(hours)h"
+        }
+        return "\(hours)h"
     }
 }
