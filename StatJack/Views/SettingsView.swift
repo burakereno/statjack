@@ -4,19 +4,16 @@ import SwiftUI
 struct SettingsView: View {
     let monitor: SystemMonitor
     @Bindable var settings = AppSettings.shared
+    @Bindable private var updater = UpdateChecker.shared
 
     private var appVersion: String {
         Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
     }
 
-    private var buildNumber: String {
-        Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
-    }
-
     var body: some View {
         VStack(spacing: 12) {
             // App Behavior
-            MetricCardView(title: "App Behavior", systemImage: AppIcons.dock) {
+            MetricCardView(title: "App Behavior", systemImage: AppIcons.dock, showIcon: false) {
                 VStack(spacing: 0) {
                     toggleRow(
                         title: "Dock Icon",
@@ -38,7 +35,7 @@ struct SettingsView: View {
             }
 
             // Menu Bar Display
-            MetricCardView(title: "Menu Bar Display", systemImage: AppIcons.menuBar) {
+            MetricCardView(title: "Menu Bar Display", systemImage: AppIcons.menuBar, showIcon: false) {
                 VStack(spacing: 0) {
                     toggleRow(
                         title: "Icon Only",
@@ -79,29 +76,14 @@ struct SettingsView: View {
                 }
             }
 
-            // Live Preview
-            MetricCardView(title: "Preview", systemImage: AppIcons.preview) {
-                HStack {
-                    Spacer()
-                    menuBarPreview
-                        .padding(.vertical, 6)
-                        .padding(.horizontal, 14)
-                        .background {
-                            RoundedRectangle(cornerRadius: 6)
-                                .fill(Color.primary.opacity(0.08))
-                        }
-                    Spacer()
-                }
-            }
-
             // About
-            MetricCardView(title: "About", systemImage: AppIcons.about) {
+            MetricCardView(title: "About", systemImage: AppIcons.about, showIcon: false) {
                 HStack {
                     VStack(alignment: .leading, spacing: 4) {
                         HStack {
                             Text("StatJack")
                                 .font(.system(size: 13, weight: .bold))
-                            Text("Version \(appVersion) (Build \(buildNumber))")
+                            Text("Version \(appVersion)")
                                 .font(.system(size: 11, weight: .medium))
                                 .foregroundStyle(.secondary)
                         }
@@ -110,6 +92,9 @@ struct SettingsView: View {
                             .foregroundStyle(.secondary)
                     }
                     Spacer()
+                    if updater.updateAvailable, let latest = updater.latestVersion {
+                        UpdateButton(version: latest)
+                    }
                 }
             }
         }
@@ -124,11 +109,11 @@ struct SettingsView: View {
         isOn: Binding<Bool>,
         disabled: Bool = false
     ) -> some View {
-        HStack(spacing: 10) {
+        HStack(alignment: .center, spacing: 10) {
             Image(systemName: icon)
-                .font(.system(size: 12, weight: .regular))
+                .font(.system(size: 14, weight: .regular))
                 .foregroundStyle(disabled ? .tertiary : .secondary)
-                .frame(width: 18, alignment: .center)
+                .frame(width: 20, alignment: .center)
 
             VStack(alignment: .leading, spacing: 1) {
                 Text(title)
@@ -138,8 +123,9 @@ struct SettingsView: View {
                     .font(.system(size: 10))
                     .foregroundStyle(.tertiary)
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
 
-            Spacer()
+            Spacer(minLength: 0)
 
             Toggle("", isOn: isOn)
                 .toggleStyle(.switch)
@@ -150,18 +136,4 @@ struct SettingsView: View {
         .padding(.vertical, 4)
     }
 
-    // MARK: - Menu Bar Preview
-
-    private var menuBarPreview: some View {
-        MenuBarContentView(
-            iconOnly: settings.iconOnly,
-            showCPU: settings.showCPU,
-            showRAM: settings.showRAM,
-            showNetwork: settings.showNetwork,
-            cpu: monitor.menuBarCPU,
-            ram: monitor.menuBarRAM,
-            net: monitor.menuBarNet
-        )
-        .foregroundStyle(.primary)
-    }
 }

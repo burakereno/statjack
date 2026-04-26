@@ -8,63 +8,71 @@ struct NetworkView: View {
     private var usage: NetworkUsage { net.networkUsage }
 
     var body: some View {
-        VStack(spacing: 12) {
-            // Upload speed
-            MetricCardView(title: "Upload", systemImage: "arrow.up.circle") {
-                HStack {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(usage.uploadFormatted)
-                            .font(.system(size: 22, weight: .bold, design: .rounded))
-                            .foregroundStyle(.blue)
-                            .contentTransition(.numericText())
-                            .animation(.easeInOut, value: usage.uploadFormatted)
-                    }
-                    Spacer()
-                    Image(systemName: "arrow.up.circle.fill")
-                        .font(.system(size: 28))
-                        .foregroundStyle(.blue.opacity(0.3))
+        MetricCardView(title: "Network", systemImage: AppIcons.network) {
+            VStack(spacing: 8) {
+                HStack(spacing: 12) {
+                    speedRow(
+                        symbol: "arrow.up",
+                        label: "UP",
+                        value: usage.uploadFormatted,
+                        color: .blue
+                    )
+                    speedRow(
+                        symbol: "arrow.down",
+                        label: "DOWN",
+                        value: usage.downloadFormatted,
+                        color: .green
+                    )
                 }
-            }
 
-            // Download speed
-            MetricCardView(title: "Download", systemImage: "arrow.down.circle") {
-                HStack {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(usage.downloadFormatted)
-                            .font(.system(size: 22, weight: .bold, design: .rounded))
-                            .foregroundStyle(.green)
-                            .contentTransition(.numericText())
-                            .animation(.easeInOut, value: usage.downloadFormatted)
-                    }
-                    Spacer()
-                    Image(systemName: "arrow.down.circle.fill")
-                        .font(.system(size: 28))
-                        .foregroundStyle(.green.opacity(0.3))
-                }
-            }
+                Divider().opacity(0.2)
 
-            // Total transferred
-            MetricCardView(title: "Session Total", systemImage: AppIcons.network) {
-                HStack(spacing: 20) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Sent")
-                            .font(.system(size: 10, weight: .medium))
-                            .foregroundStyle(.tertiary)
-                        Text(Formatters.formatBytes(usage.totalUploaded))
-                            .font(.system(size: 13, weight: .semibold, design: .monospaced))
-                            .foregroundStyle(.secondary)
-                    }
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Received")
-                            .font(.system(size: 10, weight: .medium))
-                            .foregroundStyle(.tertiary)
-                        Text(Formatters.formatBytes(usage.totalDownloaded))
-                            .font(.system(size: 13, weight: .semibold, design: .monospaced))
-                            .foregroundStyle(.secondary)
-                    }
-                    Spacer()
+                HStack(spacing: 12) {
+                    totalRow(
+                        label: "SENT",
+                        value: Formatters.formatBytes(usage.totalUploaded)
+                    )
+                    totalRow(
+                        label: "RECV",
+                        value: Formatters.formatBytes(usage.totalDownloaded)
+                    )
                 }
             }
         }
+    }
+
+    private func speedRow(symbol: String, label: String, value: String, color: Color) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: symbol)
+                .font(.system(size: 10, weight: .bold))
+                .foregroundStyle(color)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(label)
+                    .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(.tertiary)
+                    .tracking(0.5)
+                Text(value)
+                    .font(.system(size: 14, weight: .bold, design: .monospaced))
+                    .foregroundStyle(color)
+                    .contentTransition(.numericText())
+                    .animation(.easeInOut, value: value)
+            }
+            Spacer()
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    private func totalRow(label: String, value: String) -> some View {
+        HStack(spacing: 6) {
+            Text(label)
+                .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                .foregroundStyle(.tertiary)
+                .tracking(0.5)
+            Text(value)
+                .font(.system(size: 11, weight: .medium, design: .monospaced))
+                .foregroundStyle(.secondary)
+            Spacer()
+        }
+        .frame(maxWidth: .infinity)
     }
 }

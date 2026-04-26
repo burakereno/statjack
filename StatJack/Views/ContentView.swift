@@ -4,6 +4,7 @@ import SwiftUI
 struct ContentView: View {
     let monitor: SystemMonitor
     @State private var showSettings = false
+    @Bindable private var updater = UpdateChecker.shared
 
     private var appVersion: String {
         Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
@@ -105,9 +106,13 @@ struct ContentView: View {
 
             Spacer()
 
-            Text("Version \(appVersion)")
-                .font(.system(size: 10, weight: .semibold))
-                .foregroundStyle(.secondary)
+            if updater.updateAvailable, let latest = updater.latestVersion {
+                UpdateButton(version: latest)
+            } else {
+                Text("Version \(appVersion)")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(.secondary)
+            }
 
             Button(action: {
                 NSApplication.shared.terminate(nil)

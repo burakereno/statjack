@@ -29,10 +29,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         popover = NSPopover()
         popover.behavior = .transient
         popover.delegate = self
-        popover.contentSize = NSSize(width: 320, height: 560)
+        popover.contentSize = NSSize(width: 320, height: 440)
         popover.contentViewController = NSHostingController(
             rootView: ContentView(monitor: monitor)
-                .frame(width: 320, height: 560)
+                .frame(width: 320, height: 440)
         )
 
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -49,6 +49,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
                            name: .statJackSettingsChanged, object: nil)
         center.addObserver(self, selector: #selector(valuesChanged),
                            name: .statJackValuesChanged, object: nil)
+
+        UpdateChecker.shared.start()
     }
 
     func applicationWillTerminate(_ notification: Notification) {
@@ -84,6 +86,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             button.highlight(true)
             focusPopoverWindow()
             startEventMonitor()
+            Task { await UpdateChecker.shared.checkForUpdates() }
         }
     }
 

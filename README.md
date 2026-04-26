@@ -6,6 +6,20 @@
 
 **Lightweight macOS menu bar system monitor.** Track CPU, RAM, and Network usage at a glance — right from your menu bar.
 
+<p align="center">
+  <a href="https://github.com/burakereno/statjack/releases/latest/download/StatJack.dmg">
+    <img src="https://img.shields.io/badge/Download-StatJack.dmg-22c55e?style=for-the-badge&logo=apple&logoColor=white" alt="Download StatJack.dmg" height="48">
+  </a>
+  &nbsp;
+  <a href="https://github.com/burakereno/statjack/releases/latest">
+    <img src="https://img.shields.io/github/v/release/burakereno/statjack?style=for-the-badge&label=Latest&color=2563eb" alt="Latest release" height="48">
+  </a>
+</p>
+
+<p align="center">
+  <sub>macOS 14.0+ · ~3 MB · See <a href="#installation">Installation</a> for first-launch instructions</sub>
+</p>
+
 ## Features
 
 - 📊 **Real-time CPU usage** — total usage percentage with user/system split

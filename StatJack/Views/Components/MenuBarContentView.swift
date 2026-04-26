@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 struct MenuBarMetricSegment: Equatable, Identifiable {
@@ -9,16 +10,18 @@ struct MenuBarMetricSegment: Equatable, Identifiable {
 
 enum MenuBarDisplay {
     static let statusHeight: CGFloat = 22
-    static let horizontalPadding: CGFloat = 1
+    static let horizontalPadding: CGFloat = 6
     static let iconOnlyWidth: CGFloat = 22
     static let metricIconWidth: CGFloat = 14
     static let iconTextSpacing: CGFloat = 2
-    static let segmentSpacing: CGFloat = 4
+    static let segmentSpacing: CGFloat = 6
     static let metricIconPointSize: CGFloat = 12
     static let metricTextPointSize: CGFloat = 12
-    static let compactPercentSegmentWidth: CGFloat = 41
-    static let fullPercentSegmentWidth: CGFloat = 48
-    static let compactCharacterWidth: CGFloat = 7
+
+    static let metricFont = NSFont.monospacedSystemFont(
+        ofSize: metricTextPointSize,
+        weight: .medium
+    )
 
     static func showIconOnly(iconOnly: Bool, showCPU: Bool, showRAM: Bool, showNetwork: Bool) -> Bool {
         iconOnly || (!showCPU && !showRAM && !showNetwork)
@@ -47,7 +50,7 @@ enum MenuBarDisplay {
                     id: "cpu",
                     symbolName: AppIcons.cpu,
                     text: cpu,
-                    width: percentSegmentWidth(for: cpu)
+                    width: textSegmentWidth(for: cpu)
                 )
             )
         }
@@ -57,7 +60,7 @@ enum MenuBarDisplay {
                     id: "ram",
                     symbolName: AppIcons.ram,
                     text: ram,
-                    width: percentSegmentWidth(for: ram)
+                    width: textSegmentWidth(for: ram)
                 )
             )
         }
@@ -74,12 +77,9 @@ enum MenuBarDisplay {
         return segments
     }
 
-    static func percentSegmentWidth(for text: String) -> CGFloat {
-        text.count > 3 ? fullPercentSegmentWidth : compactPercentSegmentWidth
-    }
-
     static func textSegmentWidth(for text: String) -> CGFloat {
-        let textWidth = CGFloat(text.count) * compactCharacterWidth
+        let attrs: [NSAttributedString.Key: Any] = [.font: metricFont]
+        let textWidth = (text as NSString).size(withAttributes: attrs).width
         return ceil(metricIconWidth + iconTextSpacing + textWidth)
     }
 
