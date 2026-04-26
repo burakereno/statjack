@@ -42,6 +42,17 @@ jobs:
       - name: Generate Xcode Project
         run: xcodegen generate
 
+      - name: Patch Info.plist with computed version
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          SHORT_VERSION="${VERSION#v}"
+          BUILD_NUMBER=$(echo "$SHORT_VERSION" | cut -d. -f3)
+          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $SHORT_VERSION" StatJack/Info.plist
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD_NUMBER" StatJack/Info.plist
+          echo "📌 Info.plist version pinned to $SHORT_VERSION (build $BUILD_NUMBER)"
+          /usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" StatJack/Info.plist
+          /usr/libexec/PlistBuddy -c "Print :CFBundleVersion" StatJack/Info.plist
+
       - name: Build Release
         run: |
           xcodebuild -project StatJack.xcodeproj \
@@ -49,6 +60,17 @@ jobs:
             -configuration Release \
             clean build \
             SYMROOT="${PWD}/build"
+
+      - name: Verify built app version matches tag
+        run: |
+          BUILT=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" build/Release/StatJack.app/Contents/Info.plist)
+          EXPECTED="${{ steps.version.outputs.version }}"
+          EXPECTED="${EXPECTED#v}"
+          if [ "$BUILT" != "$EXPECTED" ]; then
+            echo "::error::Built app reports $BUILT but expected $EXPECTED"
+            exit 1
+          fi
+          echo "✅ Built app version $BUILT matches tag"
 
       - name: Create DMG
         run: |
