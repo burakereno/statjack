@@ -9,6 +9,8 @@ enum AppIcons {
     static let cpu = "cpu"
     static let ram = "memorychip"
     static let network = "network"
+    static let gpu = "display"
+    static let temperature = "thermometer.medium"
 
     // System
     static let clock = "clock"

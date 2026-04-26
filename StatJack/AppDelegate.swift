@@ -172,16 +172,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             iconOnly: settings.iconOnly,
             showCPU: settings.showCPU,
             showRAM: settings.showRAM,
-            showNetwork: settings.showNetwork
+            showNetwork: settings.showNetwork,
+            showGPU: settings.showGPU,
+            showTemperature: settings.showTemperature
         )
         let segments = MenuBarDisplay.metricSegments(
             iconOnly: settings.iconOnly,
             showCPU: settings.showCPU,
             showRAM: settings.showRAM,
             showNetwork: settings.showNetwork,
+            showGPU: settings.showGPU,
+            showTemperature: settings.showTemperature,
             cpu: monitor.menuBarCPU,
             ram: monitor.menuBarRAM,
-            net: monitor.menuBarNet
+            net: monitor.menuBarNet,
+            gpu: monitor.menuBarGPU,
+            temp: monitor.menuBarTemp
         )
         let state = MenuBarState(
             iconOnly: showIconOnly,

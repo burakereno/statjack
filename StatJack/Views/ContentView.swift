@@ -33,7 +33,10 @@ struct ContentView: View {
                     // All stats in one scroll
                     ScrollView {
                         VStack(spacing: 10) {
+                            PublicIPRow()
                             CPUView(monitor: monitor)
+                            GPUView(monitor: monitor)
+                            ThermalView(monitor: monitor)
                             MemoryView(monitor: monitor)
                             NetworkView(monitor: monitor)
                         }

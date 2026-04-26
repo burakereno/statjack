@@ -13,7 +13,16 @@ struct SettingsView: View {
     var body: some View {
         VStack(spacing: 12) {
             // App Behavior
-            MetricCardView(title: "App Behavior", systemImage: AppIcons.dock, showIcon: false) {
+            MetricCardView(title: "Startup", systemImage: "power", showIcon: false) {
+                toggleRow(
+                    title: "Launch at Login",
+                    subtitle: "Start StatJack automatically when you log in",
+                    icon: "power",
+                    isOn: $settings.launchAtLogin
+                )
+            }
+
+            MetricCardView(title: "Dock", systemImage: AppIcons.dock, showIcon: false) {
                 VStack(spacing: 0) {
                     toggleRow(
                         title: "Dock Icon",
@@ -72,6 +81,49 @@ struct SettingsView: View {
                         icon: AppIcons.network,
                         isOn: $settings.showNetwork,
                         disabled: settings.iconOnly
+                    )
+
+                    Divider().opacity(0.2).padding(.vertical, 2)
+
+                    toggleRow(
+                        title: "GPU Usage",
+                        subtitle: "e.g. 35%",
+                        icon: AppIcons.gpu,
+                        isOn: $settings.showGPU,
+                        disabled: settings.iconOnly
+                    )
+
+                    Divider().opacity(0.2).padding(.vertical, 2)
+
+                    toggleRow(
+                        title: "Temperature",
+                        subtitle: "e.g. 52°C",
+                        icon: AppIcons.temperature,
+                        isOn: $settings.showTemperature,
+                        disabled: settings.iconOnly
+                    )
+                }
+            }
+
+            // Alerts
+            MetricCardView(title: "Alerts", systemImage: "bell", showIcon: false) {
+                VStack(spacing: 0) {
+                    alertRow(
+                        title: "CPU Alert",
+                        subtitle: "Notify when CPU exceeds threshold",
+                        icon: AppIcons.cpu,
+                        isOn: $settings.cpuAlertEnabled,
+                        threshold: $settings.cpuAlertThreshold
+                    )
+
+                    Divider().opacity(0.2).padding(.vertical, 2)
+
+                    alertRow(
+                        title: "RAM Alert",
+                        subtitle: "Notify when memory exceeds threshold",
+                        icon: AppIcons.ram,
+                        isOn: $settings.ramAlertEnabled,
+                        threshold: $settings.ramAlertThreshold
                     )
                 }
             }
@@ -144,6 +196,59 @@ struct SettingsView: View {
             if hovering && !disabled { NSCursor.pointingHand.push() }
             else { NSCursor.pop() }
         }
+    }
+
+    // MARK: - Alert Row
+
+    private func alertRow(
+        title: String,
+        subtitle: String,
+        icon: String,
+        isOn: Binding<Bool>,
+        threshold: Binding<Double>
+    ) -> some View {
+        VStack(spacing: 4) {
+            HStack(alignment: .center, spacing: 10) {
+                Image(systemName: icon)
+                    .font(.system(size: 14, weight: .regular))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 20, alignment: .center)
+
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(title)
+                        .font(.system(size: 12, weight: .medium))
+                    Text(subtitle)
+                        .font(.system(size: 10))
+                        .foregroundStyle(.tertiary)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                Spacer(minLength: 0)
+
+                Toggle("", isOn: isOn)
+                    .toggleStyle(.switch)
+                    .controlSize(.mini)
+                    .labelsHidden()
+                    .allowsHitTesting(false)
+            }
+            .contentShape(Rectangle())
+            .onTapGesture { isOn.wrappedValue.toggle() }
+
+            if isOn.wrappedValue {
+                HStack(spacing: 8) {
+                    Slider(value: threshold, in: 0...100, step: 5)
+                        .controlSize(.small)
+                    Text("\(Int(threshold.wrappedValue))%")
+                        .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 32, alignment: .trailing)
+                }
+                .padding(.leading, 30)
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+        }
+        .padding(.vertical, 4)
+        .animation(.snappy(duration: 0.18), value: isOn.wrappedValue)
     }
 
 }

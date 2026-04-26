@@ -22,6 +22,12 @@ struct CPUView: View {
 
                 UsageBarView(percentage: cpu.totalUsage, height: 7)
 
+                SparklineView(
+                    values: monitor.cpuHistory,
+                    color: AppColors.usageColor(for: cpu.totalUsage),
+                    maxValue: 100
+                )
+
                 HStack(spacing: 12) {
                     legendItem(color: .blue, label: "USR", value: cpu.userUsage)
                     legendItem(color: .red, label: "SYS", value: cpu.systemUsage)

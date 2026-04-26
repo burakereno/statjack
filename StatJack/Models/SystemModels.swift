@@ -51,4 +51,6 @@ struct SystemSample {
     let cpu: CPUSample?
     let memory: MemoryUsage?
     let network: NetworkSample?
+    let gpuUtilization: Double?
+    let thermal: ThermalReading?
 }

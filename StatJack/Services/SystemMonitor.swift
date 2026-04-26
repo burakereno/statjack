@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import UserNotifications
 
 /// Central monitoring engine that orchestrates the remaining sub-monitors
 /// (CPU, memory, network). The polling cadence is driven externally by the
@@ -9,6 +10,8 @@ final class SystemMonitor {
     let cpuMonitor = CPUMonitor()
     let memoryMonitor = MemoryMonitor()
     let networkMonitor = NetworkMonitor()
+    let gpuMonitor = GPUMonitor()
+    let thermalMonitor = ThermalMonitor()
 
     /// Uptime in seconds since boot
     var uptime: TimeInterval = 0
@@ -17,6 +20,27 @@ final class SystemMonitor {
     var menuBarCPU: String = "0%"
     var menuBarRAM: String = "0%"
     var menuBarNet: String = "↑0K ↓0K"
+    var menuBarGPU: String = "0%"
+    var menuBarTemp: String = "0°"
+
+    /// Rolling history of recent samples for sparkline rendering.
+    /// Capped at `historyCapacity` entries; appended on every tick.
+    var cpuHistory: [Double] = []
+    var ramHistory: [Double] = []
+    var netUploadHistory: [Double] = []
+    var netDownloadHistory: [Double] = []
+    var gpuHistory: [Double] = []
+    var tempHistory: [Double] = []
+
+    @ObservationIgnored
+    static let historyCapacity = 60
+
+    @ObservationIgnored
+    private var lastCPUAlert: Date?
+    @ObservationIgnored
+    private var lastRAMAlert: Date?
+    @ObservationIgnored
+    private let alertCooldown: TimeInterval = 300
 
     @ObservationIgnored
     private var timer: Timer?
@@ -82,7 +106,7 @@ final class SystemMonitor {
         isUpdating = true
 
         let selection = metricSelection()
-        guard selection.cpu || selection.memory || selection.network else {
+        guard selection.cpu || selection.memory || selection.network || selection.extras else {
             updateUptime()
             isUpdating = false
             runPendingRefreshIfNeeded()
@@ -93,7 +117,9 @@ final class SystemMonitor {
             let sample = SystemSample(
                 cpu: selection.cpu ? CPUMonitor.sample() : nil,
                 memory: selection.memory ? MemoryMonitor.sample() : nil,
-                network: selection.network ? NetworkMonitor.sample() : nil
+                network: selection.network ? NetworkMonitor.sample() : nil,
+                gpuUtilization: selection.extras ? GPUMonitor.sample() : nil,
+                thermal: selection.extras ? ThermalMonitor.sample() : nil
             )
 
             DispatchQueue.main.async { [weak self] in
@@ -112,24 +138,29 @@ final class SystemMonitor {
         tick()
     }
 
-    private func metricSelection() -> (cpu: Bool, memory: Bool, network: Bool) {
-        guard !collectAllMetrics else { return (true, true, true) }
+    private func metricSelection() -> (cpu: Bool, memory: Bool, network: Bool, extras: Bool) {
+        guard !collectAllMetrics else { return (true, true, true, true) }
 
         let settings = AppSettings.shared
         let needsDockCPU = settings.showDockIcon && settings.showDockBadge
-        guard !settings.iconOnly else { return (needsDockCPU, false, false) }
-        return (settings.showCPU || needsDockCPU, settings.showRAM, settings.showNetwork)
+        guard !settings.iconOnly else { return (needsDockCPU, false, false, false) }
+        let extras = settings.showGPU || settings.showTemperature
+        return (settings.showCPU || needsDockCPU, settings.showRAM, settings.showNetwork, extras)
     }
 
     private func apply(_ sample: SystemSample) {
         if let cpu = sample.cpu {
             cpuMonitor.apply(cpu)
             menuBarCPU = "\(Int(cpuMonitor.totalUsage))%"
+            appendHistory(&cpuHistory, value: cpuMonitor.totalUsage)
+            checkCPUAlert(cpuMonitor.totalUsage)
         }
 
         if let memory = sample.memory {
             memoryMonitor.apply(memory)
             menuBarRAM = "\(Int(memoryMonitor.memoryUsage.usedPercentage))%"
+            appendHistory(&ramHistory, value: memoryMonitor.memoryUsage.usedPercentage)
+            checkRAMAlert(memoryMonitor.memoryUsage.usedPercentage)
         }
 
         if let network = sample.network {
@@ -137,9 +168,65 @@ final class SystemMonitor {
             let up = Formatters.formatSpeedCompact(networkMonitor.networkUsage.uploadSpeed)
             let down = Formatters.formatSpeedCompact(networkMonitor.networkUsage.downloadSpeed)
             menuBarNet = "↑\(up) ↓\(down)"
+            appendHistory(&netUploadHistory, value: networkMonitor.networkUsage.uploadSpeed)
+            appendHistory(&netDownloadHistory, value: networkMonitor.networkUsage.downloadSpeed)
+        }
+
+        gpuMonitor.apply(sample.gpuUtilization)
+        if let g = sample.gpuUtilization {
+            appendHistory(&gpuHistory, value: g)
+            menuBarGPU = "\(Int(g))%"
+        }
+
+        thermalMonitor.apply(sample.thermal)
+        if let t = sample.thermal {
+            appendHistory(&tempHistory, value: t.average)
+            menuBarTemp = "\(Int(t.average))°"
         }
 
         updateUptime()
+    }
+
+    private func appendHistory(_ history: inout [Double], value: Double) {
+        history.append(value)
+        if history.count > Self.historyCapacity {
+            history.removeFirst(history.count - Self.historyCapacity)
+        }
+    }
+
+    private func checkCPUAlert(_ value: Double) {
+        let s = AppSettings.shared
+        guard s.cpuAlertEnabled, value >= s.cpuAlertThreshold else { return }
+        if let last = lastCPUAlert, Date().timeIntervalSince(last) < alertCooldown { return }
+        lastCPUAlert = Date()
+        Self.postAlert(
+            title: "High CPU Usage",
+            body: "CPU at \(Int(value))% (threshold \(Int(s.cpuAlertThreshold))%)"
+        )
+    }
+
+    private func checkRAMAlert(_ value: Double) {
+        let s = AppSettings.shared
+        guard s.ramAlertEnabled, value >= s.ramAlertThreshold else { return }
+        if let last = lastRAMAlert, Date().timeIntervalSince(last) < alertCooldown { return }
+        lastRAMAlert = Date()
+        Self.postAlert(
+            title: "High Memory Usage",
+            body: "RAM at \(Int(value))% (threshold \(Int(s.ramAlertThreshold))%)"
+        )
+    }
+
+    private static func postAlert(title: String, body: String) {
+        let content = UNMutableNotificationContent()
+        content.title = title
+        content.body = body
+        content.sound = .default
+        let request = UNNotificationRequest(
+            identifier: UUID().uuidString,
+            content: content,
+            trigger: nil
+        )
+        UNUserNotificationCenter.current().add(request)
     }
 
     private func updateUptime() {

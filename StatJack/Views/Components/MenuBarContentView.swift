@@ -10,7 +10,7 @@ struct MenuBarMetricSegment: Equatable, Identifiable {
 
 enum MenuBarDisplay {
     static let statusHeight: CGFloat = 22
-    static let horizontalPadding: CGFloat = 6
+    static let horizontalPadding: CGFloat = 4
     static let iconOnlyWidth: CGFloat = 22
     static let metricIconWidth: CGFloat = 14
     static let iconTextSpacing: CGFloat = 2
@@ -23,8 +23,15 @@ enum MenuBarDisplay {
         weight: .medium
     )
 
-    static func showIconOnly(iconOnly: Bool, showCPU: Bool, showRAM: Bool, showNetwork: Bool) -> Bool {
-        iconOnly || (!showCPU && !showRAM && !showNetwork)
+    static func showIconOnly(
+        iconOnly: Bool,
+        showCPU: Bool,
+        showRAM: Bool,
+        showNetwork: Bool,
+        showGPU: Bool,
+        showTemperature: Bool
+    ) -> Bool {
+        iconOnly || (!showCPU && !showRAM && !showNetwork && !showGPU && !showTemperature)
     }
 
     static func metricSegments(
@@ -32,47 +39,53 @@ enum MenuBarDisplay {
         showCPU: Bool,
         showRAM: Bool,
         showNetwork: Bool,
+        showGPU: Bool,
+        showTemperature: Bool,
         cpu: String,
         ram: String,
-        net: String
+        net: String,
+        gpu: String,
+        temp: String
     ) -> [MenuBarMetricSegment] {
         guard !showIconOnly(
             iconOnly: iconOnly,
             showCPU: showCPU,
             showRAM: showRAM,
-            showNetwork: showNetwork
+            showNetwork: showNetwork,
+            showGPU: showGPU,
+            showTemperature: showTemperature
         ) else { return [] }
 
         var segments: [MenuBarMetricSegment] = []
         if showCPU {
-            segments.append(
-                MenuBarMetricSegment(
-                    id: "cpu",
-                    symbolName: AppIcons.cpu,
-                    text: cpu,
-                    width: textSegmentWidth(for: cpu)
-                )
-            )
+            segments.append(MenuBarMetricSegment(
+                id: "cpu", symbolName: AppIcons.cpu, text: cpu,
+                width: textSegmentWidth(for: cpu)
+            ))
         }
         if showRAM {
-            segments.append(
-                MenuBarMetricSegment(
-                    id: "ram",
-                    symbolName: AppIcons.ram,
-                    text: ram,
-                    width: textSegmentWidth(for: ram)
-                )
-            )
+            segments.append(MenuBarMetricSegment(
+                id: "ram", symbolName: AppIcons.ram, text: ram,
+                width: textSegmentWidth(for: ram)
+            ))
         }
         if showNetwork {
-            segments.append(
-                MenuBarMetricSegment(
-                    id: "network",
-                    symbolName: AppIcons.network,
-                    text: net,
-                    width: textSegmentWidth(for: net)
-                )
-            )
+            segments.append(MenuBarMetricSegment(
+                id: "network", symbolName: AppIcons.network, text: net,
+                width: textSegmentWidth(for: net)
+            ))
+        }
+        if showGPU {
+            segments.append(MenuBarMetricSegment(
+                id: "gpu", symbolName: AppIcons.gpu, text: gpu,
+                width: textSegmentWidth(for: gpu)
+            ))
+        }
+        if showTemperature {
+            segments.append(MenuBarMetricSegment(
+                id: "temp", symbolName: AppIcons.temperature, text: temp,
+                width: textSegmentWidth(for: temp)
+            ))
         }
         return segments
     }
@@ -106,7 +119,9 @@ struct MenuBarContentView: View {
             iconOnly: iconOnly,
             showCPU: showCPU,
             showRAM: showRAM,
-            showNetwork: showNetwork
+            showNetwork: showNetwork,
+            showGPU: false,
+            showTemperature: false
         )
     }
 
@@ -116,9 +131,13 @@ struct MenuBarContentView: View {
             showCPU: showCPU,
             showRAM: showRAM,
             showNetwork: showNetwork,
+            showGPU: false,
+            showTemperature: false,
             cpu: cpu,
             ram: ram,
-            net: net
+            net: net,
+            gpu: "",
+            temp: ""
         )
     }
 

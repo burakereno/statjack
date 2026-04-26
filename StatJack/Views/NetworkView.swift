@@ -25,6 +25,18 @@ struct NetworkView: View {
                     )
                 }
 
+                ZStack {
+                    SparklineView(
+                        values: monitor.netDownloadHistory,
+                        color: .green
+                    )
+                    SparklineView(
+                        values: monitor.netUploadHistory,
+                        color: .blue
+                    )
+                }
+                .frame(height: 22)
+
                 Divider().opacity(0.2)
 
                 HStack(spacing: 12) {
