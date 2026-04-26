@@ -120,118 +120,97 @@ final class UpdateChecker {
     private func installUpdate(dmgURL: URL) {
         let currentBundle = URL(fileURLWithPath: Bundle.main.bundlePath)
 
-        // Dev builds run from DerivedData — skip auto-install, just open the dmg
+        // Dev builds (DerivedData etc.) — skip auto-install
         guard currentBundle.path.hasPrefix("/Applications/") else {
             NSWorkspace.shared.open(dmgURL)
             return
         }
 
-        Task.detached { [weak self] in
-            guard let self else { return }
+        let scriptURL = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("statjack-install-\(UUID().uuidString).sh")
+        let logURL = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("statjack-install.log")
 
-            guard let mountPoint = Self.mount(dmgURL) else {
-                await MainActor.run {
-                    self.lastError = "Failed to mount disk image"
-                    NSWorkspace.shared.open(dmgURL)
-                }
-                return
-            }
+        let script = """
+        #!/bin/bash
+        set -u
+        exec >"\(logURL.path)" 2>&1
 
-            let mountedApp = URL(fileURLWithPath: mountPoint)
-                .appendingPathComponent("StatJack.app")
+        PARENT_PID="$1"
+        DMG="$2"
+        TARGET="\(currentBundle.path)"
 
-            guard FileManager.default.fileExists(atPath: mountedApp.path) else {
-                Self.detach(mountPoint)
-                await MainActor.run {
-                    self.lastError = "StatJack.app not found in DMG"
-                    NSWorkspace.shared.open(dmgURL)
-                }
-                return
-            }
+        echo "[install] waiting for parent $PARENT_PID to exit"
+        for _ in $(seq 1 50); do
+            kill -0 "$PARENT_PID" 2>/dev/null || break
+            sleep 0.1
+        done
+        kill -0 "$PARENT_PID" 2>/dev/null && kill "$PARENT_PID" 2>/dev/null
+        sleep 0.5
 
-            let backup = URL(fileURLWithPath: NSTemporaryDirectory())
-                .appendingPathComponent("StatJack.old.\(UUID().uuidString).app")
+        echo "[install] mounting $DMG"
+        MOUNT_OUT=$(/usr/bin/hdiutil attach -nobrowse -noautoopen -quiet "$DMG" | tail -1)
+        MOUNT_POINT=$(echo "$MOUNT_OUT" | awk -F'\\t' '{print $NF}')
+        if [ -z "$MOUNT_POINT" ] || [ ! -d "$MOUNT_POINT" ]; then
+            MOUNT_POINT="/Volumes/StatJack"
+        fi
+        echo "[install] mount point: $MOUNT_POINT"
 
-            do {
-                try FileManager.default.moveItem(at: currentBundle, to: backup)
-            } catch {
-                Self.detach(mountPoint)
-                await MainActor.run {
-                    self.lastError = "Cannot replace app: \(error.localizedDescription). Try drag-installing manually."
-                    NSWorkspace.shared.open(dmgURL)
-                }
-                return
-            }
+        SRC="$MOUNT_POINT/StatJack.app"
+        if [ ! -d "$SRC" ]; then
+            echo "[install] source app not found at $SRC — aborting"
+            /usr/bin/hdiutil detach "$MOUNT_POINT" -quiet -force 2>/dev/null
+            /usr/bin/open "$DMG"
+            exit 1
+        fi
 
-            do {
-                try FileManager.default.copyItem(at: mountedApp, to: currentBundle)
-            } catch {
-                try? FileManager.default.moveItem(at: backup, to: currentBundle)
-                Self.detach(mountPoint)
-                await MainActor.run {
-                    self.lastError = "Install failed: \(error.localizedDescription)"
-                    NSWorkspace.shared.open(dmgURL)
-                }
-                return
-            }
+        echo "[install] removing old app at $TARGET"
+        /bin/rm -rf "$TARGET"
 
-            Self.runProcess("/usr/bin/xattr", ["-cr", currentBundle.path])
-            Self.detach(mountPoint)
+        echo "[install] copying new app"
+        /usr/bin/ditto "$SRC" "$TARGET"
 
-            await MainActor.run {
-                let config = NSWorkspace.OpenConfiguration()
-                config.createsNewApplicationInstance = true
-                NSWorkspace.shared.openApplication(at: currentBundle, configuration: config) { _, _ in
-                    Task { @MainActor in
-                        NSApp.terminate(nil)
-                    }
-                }
-            }
-        }
-    }
+        echo "[install] stripping quarantine"
+        /usr/bin/xattr -cr "$TARGET"
 
-    nonisolated private static func mount(_ url: URL) -> String? {
-        let task = Process()
-        task.launchPath = "/usr/bin/hdiutil"
-        task.arguments = ["attach", "-nobrowse", "-noautoopen", "-quiet", "-plist", url.path]
-        let out = Pipe()
-        task.standardOutput = out
-        task.standardError = Pipe()
+        echo "[install] detaching dmg"
+        /usr/bin/hdiutil detach "$MOUNT_POINT" -quiet -force 2>/dev/null
+
+        echo "[install] launching new app"
+        /usr/bin/open "$TARGET"
+
+        rm -f "\(scriptURL.path)"
+        echo "[install] done"
+        """
 
         do {
-            try task.run()
-            task.waitUntilExit()
+            try script.write(to: scriptURL, atomically: true, encoding: .utf8)
+            try FileManager.default.setAttributes(
+                [.posixPermissions: 0o755],
+                ofItemAtPath: scriptURL.path
+            )
         } catch {
-            return nil
+            lastError = "Could not write installer script: \(error.localizedDescription)"
+            NSWorkspace.shared.open(dmgURL)
+            return
         }
-        guard task.terminationStatus == 0 else { return nil }
 
-        let data = out.fileHandleForReading.readDataToEndOfFile()
-        guard
-            let plist = try? PropertyListSerialization.propertyList(
-                from: data, options: [], format: nil
-            ) as? [String: Any],
-            let entities = plist["system-entities"] as? [[String: Any]]
-        else { return nil }
-
-        return entities.compactMap { $0["mount-point"] as? String }.first
-    }
-
-    nonisolated private static func detach(_ mountPoint: String) {
-        runProcess("/usr/bin/hdiutil", ["detach", mountPoint, "-quiet", "-force"])
-    }
-
-    @discardableResult
-    nonisolated private static func runProcess(_ path: String, _ args: [String]) -> Int32 {
+        let pid = ProcessInfo.processInfo.processIdentifier
         let task = Process()
-        task.launchPath = path
-        task.arguments = args
+        task.launchPath = "/bin/bash"
+        task.arguments = ["-c", "nohup \(scriptURL.path) \(pid) \(dmgURL.path) >/dev/null 2>&1 &"]
         do {
             try task.run()
-            task.waitUntilExit()
-            return task.terminationStatus
         } catch {
-            return -1
+            lastError = "Could not launch installer: \(error.localizedDescription)"
+            NSWorkspace.shared.open(dmgURL)
+            return
+        }
+
+        // Give the helper a moment to detach, then quit so it can replace the bundle.
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 300_000_000)
+            NSApp.terminate(nil)
         }
     }
 
