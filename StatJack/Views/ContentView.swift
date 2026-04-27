@@ -35,10 +35,10 @@ struct ContentView: View {
                         VStack(spacing: 10) {
                             PublicIPRow()
                             CPUView(monitor: monitor)
-                            GPUView(monitor: monitor)
-                            ThermalView(monitor: monitor)
                             MemoryView(monitor: monitor)
                             NetworkView(monitor: monitor)
+                            GPUView(monitor: monitor)
+                            ThermalView(monitor: monitor)
                         }
                         .padding(.horizontal, 12)
                         .padding(.top, 10)

@@ -23,24 +23,12 @@ struct SettingsView: View {
             }
 
             MetricCardView(title: "Dock", systemImage: AppIcons.dock, showIcon: false) {
-                VStack(spacing: 0) {
-                    toggleRow(
-                        title: "Dock Icon",
-                        subtitle: "Show StatJack in the Dock",
-                        icon: AppIcons.dock,
-                        isOn: $settings.showDockIcon
-                    )
-
-                    Divider().opacity(0.2).padding(.vertical, 2)
-
-                    toggleRow(
-                        title: "CPU Badge",
-                        subtitle: "Show CPU percentage on the Dock icon",
-                        icon: AppIcons.cpu,
-                        isOn: $settings.showDockBadge,
-                        disabled: !settings.showDockIcon
-                    )
-                }
+                toggleRow(
+                    title: "Dock Icon",
+                    subtitle: "Show StatJack in the Dock",
+                    icon: AppIcons.dock,
+                    isOn: $settings.showDockIcon
+                )
             }
 
             // Menu Bar Display
@@ -181,7 +169,7 @@ struct SettingsView: View {
 
             Toggle("", isOn: isOn)
                 .toggleStyle(.switch)
-                .controlSize(.mini)
+                .controlSize(.small)
                 .labelsHidden()
                 .disabled(disabled)
                 .allowsHitTesting(false)
@@ -227,7 +215,7 @@ struct SettingsView: View {
 
                 Toggle("", isOn: isOn)
                     .toggleStyle(.switch)
-                    .controlSize(.mini)
+                    .controlSize(.small)
                     .labelsHidden()
                     .allowsHitTesting(false)
             }

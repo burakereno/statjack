@@ -71,14 +71,6 @@ final class AppSettings {
         }
     }
 
-    /// Show CPU percentage as the Dock icon badge
-    var showDockBadge: Bool {
-        didSet {
-            UserDefaults.standard.set(showDockBadge, forKey: "showDockBadge")
-            notifyChanged()
-        }
-    }
-
     /// Launch StatJack automatically when you log in
     var launchAtLogin: Bool {
         didSet {
@@ -149,7 +141,6 @@ final class AppSettings {
         self.showGPU = defaults.object(forKey: "showGPU") as? Bool ?? false
         self.showTemperature = defaults.object(forKey: "showTemperature") as? Bool ?? false
         self.showDockIcon = defaults.object(forKey: "showDockIcon") as? Bool ?? false
-        self.showDockBadge = defaults.object(forKey: "showDockBadge") as? Bool ?? false
         self.launchAtLogin = SMAppService.mainApp.status == .enabled
         self.cpuAlertEnabled = defaults.object(forKey: "cpuAlertEnabled") as? Bool ?? false
         self.cpuAlertThreshold = defaults.object(forKey: "cpuAlertThreshold") as? Double ?? 90

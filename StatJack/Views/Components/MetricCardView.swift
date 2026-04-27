@@ -48,7 +48,7 @@ struct MetricCardView<Content: View>: View {
 
     private var cardFill: Color {
         if colorScheme == .dark {
-            return Color.black.opacity(0.16)
+            return Color.black.opacity(0.30)
         }
         return Color.black.opacity(0.03)
     }

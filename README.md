@@ -8,11 +8,11 @@
 
 <p align="center">
   <a href="https://github.com/burakereno/statjack/releases/latest/download/StatJack.dmg">
-    <img src="https://img.shields.io/badge/Download-StatJack.dmg-22c55e?style=for-the-badge&logo=apple&logoColor=white" alt="Download StatJack.dmg" height="48">
+    <img src="https://img.shields.io/badge/Download-StatJack.dmg-22c55e?style=for-the-badge&logo=apple&logoColor=white&cb=2" alt="Download StatJack.dmg" height="48">
   </a>
   &nbsp;
   <a href="https://github.com/burakereno/statjack/releases/latest">
-    <img src="https://img.shields.io/github/v/release/burakereno/statjack?style=for-the-badge&label=Latest&color=2563eb" alt="Latest release" height="48">
+    <img src="https://img.shields.io/github/v/release/burakereno/statjack?style=for-the-badge&label=Latest&color=2563eb&cb=2" alt="Latest release" height="48">
   </a>
 </p>
 
@@ -38,13 +38,17 @@
 ## Screenshots
 
 <p align="center">
-  <img src="docs/dashboard.png" alt="Dashboard with CPU, GPU, Temperature, Memory, Network and the Public IP chip" width="340">
+  <img src="docs/dashboard.png" alt="Dashboard with Public IP, CPU, Memory and Network" width="320">
   &nbsp;&nbsp;
-  <img src="docs/settings.png" alt="Settings with Startup, Dock and Menu Bar Display sections" width="340">
+  <img src="docs/extras.png" alt="GPU and Temperature cards with sparklines" width="320">
 </p>
 
 <p align="center">
-  <sub>Dashboard (left) — sparklines under each metric, Public IP chip at the top. Settings (right) — Startup, Dock and Menu Bar Display sections.</sub>
+  <img src="docs/alerts.png" alt="Threshold alerts and About card with the in-app update button" width="320">
+</p>
+
+<p align="center">
+  <sub>CPU / Memory / Network with live sparklines · GPU + temperature for Apple Silicon · per-metric threshold notifications and one-click in-app updates.</sub>
 </p>
 
 ## Installation

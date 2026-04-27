@@ -6,6 +6,11 @@ struct UsageBarView: View {
     let height: CGFloat
     let showLabel: Bool
 
+    /// Animation is suppressed on the very first render so a freshly-appearing
+    /// bar (e.g. GPU / Temp when the popover opens for the first time) doesn't
+    /// slide in from 0 — we want it to appear at its real width instantly.
+    @State private var enableAnimation = false
+
     init(percentage: Double, height: CGFloat = 8, showLabel: Bool = false) {
         self.percentage = min(max(percentage, 0), 100)
         self.height = height
@@ -24,7 +29,7 @@ struct UsageBarView: View {
                     RoundedRectangle(cornerRadius: height / 2)
                         .fill(AppColors.usageGradient(for: percentage))
                         .frame(width: max(0, geometry.size.width * percentage / 100))
-                        .animation(.easeInOut(duration: 0.5), value: percentage)
+                        .animation(enableAnimation ? .easeInOut(duration: 0.5) : nil, value: percentage)
                 }
             }
             .frame(height: height)
@@ -35,7 +40,13 @@ struct UsageBarView: View {
                     .foregroundStyle(AppColors.usageColor(for: percentage))
                     .frame(width: 40, alignment: .trailing)
                     .contentTransition(.numericText())
-                    .animation(.easeInOut, value: Int(percentage))
+                    .animation(enableAnimation ? .easeInOut : nil, value: Int(percentage))
+            }
+        }
+        .onAppear {
+            Task { @MainActor in
+                try? await Task.sleep(for: .milliseconds(120))
+                enableAnimation = true
             }
         }
     }

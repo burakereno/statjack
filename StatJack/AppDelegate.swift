@@ -29,6 +29,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         popover = NSPopover()
         popover.behavior = .transient
         popover.delegate = self
+        popover.appearance = NSAppearance(named: .darkAqua)
         popover.contentSize = NSSize(width: 320, height: 440)
         popover.contentViewController = NSHostingController(
             rootView: ContentView(monitor: monitor)
@@ -41,8 +42,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             button.action = #selector(togglePopover(_:))
             button.target = self
             updateMenuBarButton()
-            updateDockBadge()
         }
+        NSApp.dockTile.badgeLabel = nil
 
         let center = NotificationCenter.default
         center.addObserver(self, selector: #selector(settingsChanged),
@@ -63,12 +64,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         updateMonitoringMode()
         monitor.refreshNow()
         updateMenuBarButton()
-        updateDockBadge()
     }
 
     @objc private func valuesChanged() {
         updateMenuBarButton()
-        updateDockBadge()
     }
 
     // MARK: - Popover
@@ -83,7 +82,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             monitor.refreshNow()
             NSApp.activate(ignoringOtherApps: true)
             popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
-            button.highlight(true)
             focusPopoverWindow()
             startEventMonitor()
             Task { await UpdateChecker.shared.checkForUpdates() }
@@ -99,12 +97,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
 
     private func closePopover() {
         popover.performClose(nil)
-        statusItem.button?.highlight(false)
         stopEventMonitor()
     }
 
     func popoverDidClose(_ notification: Notification) {
-        statusItem.button?.highlight(false)
         stopEventMonitor()
         updateMonitoringMode()
         monitor.refreshNow()
@@ -145,16 +141,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         if policy == .regular {
             NSApp.activate(ignoringOtherApps: true)
         }
-    }
-
-    private func updateDockBadge() {
-        let settings = AppSettings.shared
-        guard settings.showDockIcon && settings.showDockBadge else {
-            NSApp.dockTile.badgeLabel = nil
-            return
-        }
-
-        NSApp.dockTile.badgeLabel = monitor.menuBarCPU
     }
 
     // MARK: - Update Menu Bar
