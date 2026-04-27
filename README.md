@@ -38,17 +38,13 @@
 ## Screenshots
 
 <p align="center">
-  <img src="docs/dashboard.png" alt="Dashboard with Public IP, CPU, Memory and Network" width="320">
+  <img src="docs/extras.png" alt="Dashboard with Public IP, CPU, GPU and Temperature cards" width="320">
   &nbsp;&nbsp;
-  <img src="docs/extras.png" alt="GPU and Temperature cards with sparklines" width="320">
-</p>
-
-<p align="center">
   <img src="docs/alerts.png" alt="Threshold alerts and About card with the in-app update button" width="320">
 </p>
 
 <p align="center">
-  <sub>CPU / Memory / Network with live sparklines · GPU + temperature for Apple Silicon · per-metric threshold notifications and one-click in-app updates.</sub>
+  <sub>Live sparklines under every metric · GPU + temperature for Apple Silicon · per-metric threshold notifications and one-click in-app updates.</sub>
 </p>
 
 ## Installation
