@@ -22,18 +22,30 @@
 
 ## Features
 
-- 📊 **Real-time CPU usage** — total usage percentage with user/system split
-- 🧠 **Memory monitoring** — used/total RAM with breakdown (active, wired, compressed)
-- 🌐 **Network speed** — live upload/download speeds + session totals
-- ⚡ **Minimal resource usage** — adaptive polling with hidden metrics skipped while idle
-- 🎛️ **Configurable** — toggle which metrics appear in the menu bar
-- 🖥️ **Native macOS** — built with SwiftUI + AppKit, runs as a menu bar app
+- 📊 **CPU** — total usage with user/system split
+- 🧠 **Memory** — used/total RAM with active / wired / compressed breakdown
+- 🌐 **Network** — live upload/download speeds + session totals
+- 🎮 **GPU** — utilization via IOAccelerator
+- 🌡️ **Temperature** — average + peak across all SoC sensors (Apple Silicon)
+- 📈 **Sparklines** — last 60 samples drawn under every metric
+- 🔔 **Threshold alerts** — macOS notifications when CPU or RAM cross your set %
+- 🌍 **Public IP** — fetched once at launch, click to copy
+- 🚀 **Launch at Login** — system Login Items via SMAppService
+- ⬇️ **One-click in-app updates** — checks GitHub releases, downloads + installs the new DMG without leaving the app
+- ⚡ **Minimal resource usage** — adaptive polling, hidden metrics skipped while idle
+- 🖥️ **Native macOS** — SwiftUI + AppKit, runs as a menu bar app
 
 ## Screenshots
 
-| Menu Bar | Dashboard |
-|----------|-----------|
-| CPU, RAM, and Network stats displayed inline in the menu bar | Click to see detailed metrics in a popover |
+<p align="center">
+  <img src="docs/dashboard.png" alt="Dashboard with CPU, GPU, Temperature, Memory, Network and the Public IP chip" width="340">
+  &nbsp;&nbsp;
+  <img src="docs/settings.png" alt="Settings with Startup, Dock and Menu Bar Display sections" width="340">
+</p>
+
+<p align="center">
+  <sub>Dashboard (left) — sparklines under each metric, Public IP chip at the top. Settings (right) — Startup, Dock and Menu Bar Display sections.</sub>
+</p>
 
 ## Installation
 
@@ -67,7 +79,7 @@ Then double-click StatJack to launch it. The app will appear in your menu bar (n
 
 ```bash
 # Clone the repo
-git clone https://github.com/AnaEren/statjack.git
+git clone https://github.com/burakereno/statjack.git
 cd statjack
 
 # Generate Xcode project
