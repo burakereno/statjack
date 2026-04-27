@@ -17,6 +17,7 @@ enum AppIcons {
 
     // UI
     static let settings = "gearshape.fill"
+    static let activityMonitor = "waveform.path.ecg.rectangle"
     static let close = "xmark.circle.fill"
     static let iconOnly = "circle.dotted"
     static let preview = "eye"

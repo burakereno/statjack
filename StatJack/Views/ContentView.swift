@@ -75,25 +75,44 @@ struct ContentView: View {
 
             Spacer()
 
-            Button(action: {
-                withAnimation(.snappy(duration: 0.24)) {
-                    showSettings.toggle()
+            HStack(spacing: 10) {
+                Button(action: openActivityMonitor) {
+                    Image(systemName: AppIcons.activityMonitor)
+                        .font(.system(size: 14))
+                        .foregroundStyle(.secondary)
                 }
-            }) {
-                Image(systemName: showSettings ? AppIcons.close : AppIcons.settings)
-                    .font(.system(size: 14))
-                    .foregroundStyle(showSettings ? .primary : .secondary)
-                    .contentTransition(.symbolEffect(.replace))
+                .buttonStyle(.plain)
+                .onHover { hovering in
+                    if hovering { NSCursor.pointingHand.push() }
+                    else { NSCursor.pop() }
+                }
+                .help("Open Activity Monitor")
+
+                Button(action: {
+                    withAnimation(.snappy(duration: 0.24)) {
+                        showSettings.toggle()
+                    }
+                }) {
+                    Image(systemName: showSettings ? AppIcons.close : AppIcons.settings)
+                        .font(.system(size: 14))
+                        .foregroundStyle(showSettings ? .primary : .secondary)
+                        .contentTransition(.symbolEffect(.replace))
+                }
+                .buttonStyle(.plain)
+                .onHover { hovering in
+                    if hovering { NSCursor.pointingHand.push() }
+                    else { NSCursor.pop() }
+                }
+                .help(showSettings ? "Close Settings" : "Settings")
             }
-            .buttonStyle(.plain)
-            .onHover { hovering in
-                if hovering { NSCursor.pointingHand.push() }
-                else { NSCursor.pop() }
-            }
-            .help(showSettings ? "Close Settings" : "Settings")
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
+    }
+
+    private func openActivityMonitor() {
+        let url = URL(fileURLWithPath: "/System/Applications/Utilities/Activity Monitor.app")
+        NSWorkspace.shared.open(url)
     }
 
     // MARK: - Footer
