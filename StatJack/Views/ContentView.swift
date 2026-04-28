@@ -34,6 +34,7 @@ struct ContentView: View {
                     ScrollView {
                         VStack(spacing: 10) {
                             PublicIPRow()
+                            SummaryRibbonView(monitor: monitor)
                             CPUView(monitor: monitor)
                             MemoryView(monitor: monitor)
                             NetworkView(monitor: monitor)
@@ -157,5 +158,123 @@ struct ContentView: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 8)
+    }
+}
+
+private struct SummaryRibbonView: View {
+    let monitor: SystemMonitor
+
+    private let columns = Array(
+        repeating: GridItem(.flexible(minimum: 0), spacing: 5),
+        count: 5
+    )
+
+    var body: some View {
+        LazyVGrid(columns: columns, spacing: 5) {
+            ForEach(metrics) { metric in
+                SummaryMetricTile(metric: metric)
+            }
+        }
+    }
+
+    private var metrics: [SummaryMetric] {
+        let cpuUsage = monitor.cpuMonitor.totalUsage
+        let ramUsage = monitor.memoryMonitor.memoryUsage.usedPercentage
+        let networkUsage = monitor.networkMonitor.networkUsage
+        let gpuUsage = monitor.gpuMonitor.utilization
+        let thermalReading = monitor.thermalMonitor.reading
+
+        return [
+            SummaryMetric(
+                id: "cpu",
+                label: "CPU",
+                value: "\(Int(cpuUsage))%",
+                systemImage: AppIcons.cpu,
+                color: AppColors.usageColor(for: cpuUsage)
+            ),
+            SummaryMetric(
+                id: "ram",
+                label: "RAM",
+                value: "\(Int(ramUsage))%",
+                systemImage: AppIcons.ram,
+                color: AppColors.usageColor(for: ramUsage)
+            ),
+            SummaryMetric(
+                id: "network",
+                label: "NET",
+                value: "↑\(Formatters.formatSpeedCompact(networkUsage.uploadSpeed)) ↓\(Formatters.formatSpeedCompact(networkUsage.downloadSpeed))",
+                systemImage: AppIcons.network,
+                color: .cyan
+            ),
+            SummaryMetric(
+                id: "gpu",
+                label: "GPU",
+                value: gpuUsage.map { "\(Int($0))%" } ?? "--",
+                systemImage: AppIcons.gpu,
+                color: gpuUsage.map(AppColors.usageColor(for:)) ?? .secondary
+            ),
+            SummaryMetric(
+                id: "temp",
+                label: "TEMP",
+                value: thermalReading.map { "\(Int($0.average))°" } ?? "--",
+                systemImage: AppIcons.temperature,
+                color: thermalReading.map { tempColor($0.average) } ?? .secondary
+            )
+        ]
+    }
+
+    private func tempColor(_ celsius: Double) -> Color {
+        switch celsius {
+        case ..<60:   return .green
+        case 60..<75: return .yellow
+        case 75..<90: return .orange
+        default:      return .red
+        }
+    }
+}
+
+private struct SummaryMetric: Identifiable {
+    let id: String
+    let label: String
+    let value: String
+    let systemImage: String
+    let color: Color
+}
+
+private struct SummaryMetricTile: View {
+    let metric: SummaryMetric
+
+    var body: some View {
+        VStack(spacing: 4) {
+            HStack(spacing: 3) {
+                Image(systemName: metric.systemImage)
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundStyle(.secondary)
+
+                Text(metric.label)
+                    .font(.system(size: 8.5, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(.tertiary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+            }
+
+            Text(metric.value)
+                .font(.system(size: 13, weight: .bold, design: .monospaced))
+                .foregroundStyle(metric.color)
+                .lineLimit(1)
+                .minimumScaleFactor(0.72)
+                .frame(maxWidth: .infinity)
+        }
+        .frame(height: 42)
+        .frame(maxWidth: .infinity)
+        .padding(.horizontal, 4)
+        .background {
+            RoundedRectangle(cornerRadius: 6)
+                .fill(Color.primary.opacity(0.035))
+        }
+        .overlay {
+            RoundedRectangle(cornerRadius: 6)
+                .stroke(Color.primary.opacity(0.055), lineWidth: 1)
+        }
     }
 }

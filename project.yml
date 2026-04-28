@@ -22,8 +22,8 @@ targets:
     info:
       path: StatJack/Info.plist
       properties:
-        CFBundleShortVersionString: "1.0.25"
-        CFBundleVersion: "25"
+        CFBundleShortVersionString: "1.0.26"
+        CFBundleVersion: "26"
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.statjack.app
