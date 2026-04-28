@@ -10,10 +10,31 @@ extension Notification.Name {
     static let statJackSettingsChanged = Notification.Name("StatJackSettingsChanged")
 }
 
+enum DockBadgeMetric: String, CaseIterable, Identifiable {
+    case cpu
+    case ram
+    case temperature
+    case gpu
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .cpu: "CPU"
+        case .ram: "RAM"
+        case .temperature: "Temp"
+        case .gpu: "GPU"
+        }
+    }
+}
+
 /// Persistent app settings with native toggle support
 @Observable
 final class AppSettings {
     static let shared = AppSettings()
+
+    @ObservationIgnored
+    private var isRevertingLaunchAtLogin = false
 
     /// If true, show only the gauge icon — all other toggles disabled
     var iconOnly: Bool {
@@ -71,11 +92,37 @@ final class AppSettings {
         }
     }
 
+    /// Show CPU percentage as the Dock icon badge
+    var showDockBadge: Bool {
+        didSet {
+            UserDefaults.standard.set(showDockBadge, forKey: "showDockBadge")
+            notifyChanged()
+        }
+    }
+
+    /// Metric shown on the Dock icon badge
+    var dockBadgeMetric: DockBadgeMetric {
+        didSet {
+            UserDefaults.standard.set(dockBadgeMetric.rawValue, forKey: "dockBadgeMetric")
+            notifyChanged()
+        }
+    }
+
     /// Launch StatJack automatically when you log in
     var launchAtLogin: Bool {
         didSet {
-            UserDefaults.standard.set(launchAtLogin, forKey: "launchAtLogin")
-            applyLaunchAtLogin()
+            guard !isRevertingLaunchAtLogin else { return }
+            if applyLaunchAtLogin(launchAtLogin) {
+                UserDefaults.standard.set(launchAtLogin, forKey: "launchAtLogin")
+            } else {
+                let actual = Self.isLaunchAtLoginEnabled
+                UserDefaults.standard.set(actual, forKey: "launchAtLogin")
+                if launchAtLogin != actual {
+                    isRevertingLaunchAtLogin = true
+                    launchAtLogin = actual
+                    isRevertingLaunchAtLogin = false
+                }
+            }
         }
     }
 
@@ -109,10 +156,15 @@ final class AppSettings {
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
     }
 
-    private func applyLaunchAtLogin() {
+    private static var isLaunchAtLoginEnabled: Bool {
+        SMAppService.mainApp.status == .enabled
+    }
+
+    @discardableResult
+    private func applyLaunchAtLogin(_ enabled: Bool) -> Bool {
         let service = SMAppService.mainApp
         do {
-            if launchAtLogin {
+            if enabled {
                 if service.status != .enabled {
                     try service.register()
                 }
@@ -121,8 +173,10 @@ final class AppSettings {
                     try service.unregister()
                 }
             }
+            return true
         } catch {
             NSLog("StatJack: launch-at-login update failed: \(error.localizedDescription)")
+            return false
         }
     }
 
@@ -141,7 +195,10 @@ final class AppSettings {
         self.showGPU = defaults.object(forKey: "showGPU") as? Bool ?? false
         self.showTemperature = defaults.object(forKey: "showTemperature") as? Bool ?? false
         self.showDockIcon = defaults.object(forKey: "showDockIcon") as? Bool ?? false
-        self.launchAtLogin = SMAppService.mainApp.status == .enabled
+        self.showDockBadge = defaults.object(forKey: "showDockBadge") as? Bool ?? false
+        let dockBadgeMetricRaw = defaults.string(forKey: "dockBadgeMetric")
+        self.dockBadgeMetric = dockBadgeMetricRaw.flatMap(DockBadgeMetric.init(rawValue:)) ?? .cpu
+        self.launchAtLogin = Self.isLaunchAtLoginEnabled
         self.cpuAlertEnabled = defaults.object(forKey: "cpuAlertEnabled") as? Bool ?? false
         self.cpuAlertThreshold = defaults.object(forKey: "cpuAlertThreshold") as? Double ?? 90
         self.ramAlertEnabled = defaults.object(forKey: "ramAlertEnabled") as? Bool ?? false

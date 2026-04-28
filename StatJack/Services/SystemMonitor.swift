@@ -20,8 +20,8 @@ final class SystemMonitor {
     var menuBarCPU: String = "0%"
     var menuBarRAM: String = "0%"
     var menuBarNet: String = "↑0K ↓0K"
-    var menuBarGPU: String = "0%"
-    var menuBarTemp: String = "0°"
+    var menuBarGPU: String = "--"
+    var menuBarTemp: String = "--"
 
     /// Rolling history of recent samples for sparkline rendering.
     /// Capped at `historyCapacity` entries; appended on every tick.
@@ -142,9 +142,15 @@ final class SystemMonitor {
         guard !collectAllMetrics else { return (true, true, true, true) }
 
         let settings = AppSettings.shared
-        guard !settings.iconOnly else { return (false, false, false, false) }
-        let extras = settings.showGPU || settings.showTemperature
-        return (settings.showCPU, settings.showRAM, settings.showNetwork, extras)
+        let dockMetric = settings.showDockIcon && settings.showDockBadge ? settings.dockBadgeMetric : nil
+        let needsDockCPU = dockMetric == .cpu
+        let needsDockMemory = dockMetric == .ram
+        let needsDockExtras = dockMetric == .gpu || dockMetric == .temperature
+        let needsCPU = (!settings.iconOnly && settings.showCPU) || settings.cpuAlertEnabled || needsDockCPU
+        let needsMemory = (!settings.iconOnly && settings.showRAM) || settings.ramAlertEnabled || needsDockMemory
+        let needsNetwork = !settings.iconOnly && settings.showNetwork
+        let needsExtras = (!settings.iconOnly && (settings.showGPU || settings.showTemperature)) || needsDockExtras
+        return (needsCPU, needsMemory, needsNetwork, needsExtras)
     }
 
     private func apply(_ sample: SystemSample) {
@@ -175,12 +181,16 @@ final class SystemMonitor {
         if let g = sample.gpuUtilization {
             appendHistory(&gpuHistory, value: g)
             menuBarGPU = "\(Int(g))%"
+        } else {
+            menuBarGPU = "--"
         }
 
         thermalMonitor.apply(sample.thermal)
         if let t = sample.thermal {
             appendHistory(&tempHistory, value: t.average)
             menuBarTemp = "\(Int(t.average))°"
+        } else {
+            menuBarTemp = "--"
         }
 
         updateUptime()

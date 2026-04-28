@@ -22,6 +22,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         let segments: [MenuBarMetricSegment]
     }
 
+    func applicationWillFinishLaunching(_ notification: Notification) {
+        applyActivationPolicy()
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         monitor = SystemMonitor()
         applyActivationPolicy()
@@ -43,7 +47,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             button.target = self
             updateMenuBarButton()
         }
-        NSApp.dockTile.badgeLabel = nil
+        updateDockBadge()
 
         let center = NotificationCenter.default
         center.addObserver(self, selector: #selector(settingsChanged),
@@ -64,10 +68,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         updateMonitoringMode()
         monitor.refreshNow()
         updateMenuBarButton()
+        updateDockBadge()
     }
 
     @objc private func valuesChanged() {
         updateMenuBarButton()
+        updateDockBadge()
     }
 
     // MARK: - Popover
@@ -140,6 +146,32 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
 
         if policy == .regular {
             NSApp.activate(ignoringOtherApps: true)
+        }
+    }
+
+    private func updateDockBadge() {
+        let settings = AppSettings.shared
+        guard settings.showDockIcon, settings.showDockBadge else {
+            NSApp.dockTile.badgeLabel = nil
+            NSApp.dockTile.contentView = nil
+            return
+        }
+
+        NSApp.dockTile.badgeLabel = nil
+        NSApp.dockTile.contentView = DockBadgeView(label: dockBadgeLabel(for: settings.dockBadgeMetric))
+        NSApp.dockTile.display()
+    }
+
+    private func dockBadgeLabel(for metric: DockBadgeMetric) -> String {
+        switch metric {
+        case .cpu:
+            monitor.menuBarCPU
+        case .ram:
+            monitor.menuBarRAM
+        case .temperature:
+            monitor.menuBarTemp
+        case .gpu:
+            monitor.menuBarGPU
         }
     }
 
@@ -258,5 +290,62 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             height: symbolSize.height
         )
         symbol.draw(in: rect)
+    }
+}
+
+private final class DockBadgeView: NSView {
+    private let label: String
+
+    init(label: String) {
+        self.label = label
+        super.init(frame: NSRect(origin: .zero, size: NSApp.dockTile.size))
+        wantsLayer = true
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        nil
+    }
+
+    override func draw(_ dirtyRect: NSRect) {
+        super.draw(dirtyRect)
+
+        let bounds = self.bounds
+        NSApp.applicationIconImage.draw(
+            in: bounds,
+            from: .zero,
+            operation: .sourceOver,
+            fraction: 1
+        )
+
+        let paragraph = NSMutableParagraphStyle()
+        paragraph.alignment = .center
+
+        let fontSize = max(18, bounds.height * 0.18)
+        let attrs: [NSAttributedString.Key: Any] = [
+            .font: NSFont.systemFont(ofSize: fontSize, weight: .bold),
+            .foregroundColor: NSColor.white,
+            .paragraphStyle: paragraph
+        ]
+        let textSize = (label as NSString).size(withAttributes: attrs)
+        let badgeHeight = max(bounds.height * 0.3, textSize.height + 10)
+        let badgeWidth = max(badgeHeight, textSize.width + 20)
+        let badgeRect = NSRect(
+            x: bounds.maxX - badgeWidth - bounds.width * 0.03,
+            y: bounds.maxY - badgeHeight - bounds.height * 0.02,
+            width: badgeWidth,
+            height: badgeHeight
+        )
+
+        NSColor.systemRed.setFill()
+        NSBezierPath(roundedRect: badgeRect, xRadius: badgeHeight / 2, yRadius: badgeHeight / 2).fill()
+
+        let textRect = NSRect(
+            x: badgeRect.minX,
+            y: badgeRect.midY - textSize.height / 2,
+            width: badgeRect.width,
+            height: textSize.height
+        )
+        (label as NSString).draw(in: textRect, withAttributes: attrs)
     }
 }

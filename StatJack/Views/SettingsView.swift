@@ -23,12 +23,28 @@ struct SettingsView: View {
             }
 
             MetricCardView(title: "Dock", systemImage: AppIcons.dock, showIcon: false) {
-                toggleRow(
-                    title: "Dock Icon",
-                    subtitle: "Show StatJack in the Dock",
-                    icon: AppIcons.dock,
-                    isOn: $settings.showDockIcon
-                )
+                VStack(spacing: 0) {
+                    toggleRow(
+                        title: "Dock Icon",
+                        subtitle: "Show StatJack in the Dock",
+                        icon: AppIcons.dock,
+                        isOn: $settings.showDockIcon
+                    )
+
+                    Divider().opacity(0.2).padding(.vertical, 2)
+
+                    toggleRow(
+                        title: "Badge",
+                        subtitle: "Show a metric on the Dock icon",
+                        icon: AppIcons.cpu,
+                        isOn: $settings.showDockBadge,
+                        disabled: !settings.showDockIcon
+                    )
+
+                    Divider().opacity(0.2).padding(.vertical, 2)
+
+                    dockBadgeMetricRow(disabled: !settings.showDockIcon || !settings.showDockBadge)
+                }
             }
 
             // Menu Bar Display
@@ -137,6 +153,52 @@ struct SettingsView: View {
                     }
                 }
             }
+        }
+    }
+
+    // MARK: - Dock Badge Metric Row
+
+    private func dockBadgeMetricRow(disabled: Bool = false) -> some View {
+        HStack(alignment: .center, spacing: 10) {
+            Image(systemName: icon(for: settings.dockBadgeMetric))
+                .font(.system(size: 14, weight: .regular))
+                .foregroundStyle(disabled ? .tertiary : .secondary)
+                .frame(width: 20, alignment: .center)
+
+            VStack(alignment: .leading, spacing: 1) {
+                Text("Badge Metric")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(disabled ? .tertiary : .primary)
+                Text("CPU, RAM, Temp, or GPU")
+                    .font(.system(size: 10))
+                    .foregroundStyle(.tertiary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            Picker("", selection: $settings.dockBadgeMetric) {
+                ForEach(DockBadgeMetric.allCases) { metric in
+                    Text(metric.title).tag(metric)
+                }
+            }
+            .labelsHidden()
+            .pickerStyle(.menu)
+            .controlSize(.small)
+            .frame(width: 86)
+            .disabled(disabled)
+        }
+        .padding(.vertical, 4)
+    }
+
+    private func icon(for metric: DockBadgeMetric) -> String {
+        switch metric {
+        case .cpu:
+            AppIcons.cpu
+        case .ram:
+            AppIcons.ram
+        case .temperature:
+            AppIcons.temperature
+        case .gpu:
+            AppIcons.gpu
         }
     }
 
