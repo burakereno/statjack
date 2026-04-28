@@ -38,13 +38,19 @@
 ## Screenshots
 
 <p align="center">
-  <img src="docs/extras.png" alt="Dashboard with Public IP, CPU, GPU and Temperature cards" width="320">
+  <img src="docs/dashboard.png" alt="Dashboard with CPU, Memory and Network cards" width="320">
   &nbsp;&nbsp;
-  <img src="docs/alerts.png" alt="Threshold alerts and About card with the in-app update button" width="320">
+  <img src="docs/extras.png" alt="Dashboard with GPU and Temperature cards" width="320">
 </p>
 
 <p align="center">
-  <sub>Live sparklines under every metric · GPU + temperature for Apple Silicon · per-metric threshold notifications and one-click in-app updates.</sub>
+  <img src="docs/settings-dock.png" alt="Settings with Dock icon and badge metric controls" width="320">
+  &nbsp;&nbsp;
+  <img src="docs/alerts.png" alt="Settings with menu bar toggles, threshold alerts and About card" width="320">
+</p>
+
+<p align="center">
+  <sub>Live sparklines under every metric · GPU + temperature for Apple Silicon · Dock badge metric picker · threshold notifications.</sub>
 </p>
 
 ## Installation
