@@ -183,24 +183,45 @@ struct SettingsView: View {
         Button {
             Task { await updater.checkForUpdates(force: true) }
         } label: {
-            Text(updater.isChecking ? "Checking" : "Check")
-                .font(.system(size: 10, weight: .semibold))
-                .foregroundStyle(updater.isChecking ? .tertiary : .secondary)
-                .frame(width: 74, height: 24)
-                .background {
-                    RoundedRectangle(cornerRadius: 4)
-                        .fill(Color.primary.opacity(updater.isChecking ? 0.035 : 0.06))
-                }
+            HStack(spacing: 4) {
+                Image(systemName: updater.isChecking ? "arrow.triangle.2.circlepath.circle.fill" : "arrow.clockwise")
+                    .font(.system(size: 9, weight: .semibold))
+                    .contentTransition(.symbolEffect(.replace))
+                Text(updateCheckButtonTitle)
+                    .font(.system(size: 10, weight: .semibold))
+            }
+            .foregroundStyle(updateCheckButtonForeground)
+            .frame(width: 86, height: 24)
+            .background {
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(Color.primary.opacity(updater.isChecking ? 0.035 : 0.06))
+            }
         }
         .buttonStyle(.plain)
-        .frame(width: 74, height: 24)
+        .frame(width: 86, height: 24)
         .contentShape(Rectangle())
         .disabled(updater.isChecking)
         .help(updater.isChecking ? "Checking for Updates" : "Check for Updates")
+        .animation(.snappy(duration: 0.18), value: updater.isChecking)
+        .animation(.snappy(duration: 0.18), value: updater.lastCheckCompletedAt)
         .onHover { hovering in
             if hovering && !updater.isChecking { NSCursor.pointingHand.push() }
             else { NSCursor.pop() }
         }
+    }
+
+    private var updateCheckButtonTitle: String {
+        if updater.isChecking { return "Checking" }
+        if updater.lastError != nil { return "Failed" }
+        if updater.isUpToDate && updater.lastCheckCompletedAt != nil { return "Up to date" }
+        return "Check"
+    }
+
+    private var updateCheckButtonForeground: Color {
+        if updater.isChecking { return Color(nsColor: .tertiaryLabelColor) }
+        if updater.lastError != nil { return .red }
+        if updater.isUpToDate && updater.lastCheckCompletedAt != nil { return .green }
+        return .secondary
     }
 
     @ViewBuilder
@@ -217,10 +238,10 @@ struct SettingsView: View {
             Text("Update check failed")
                 .font(.system(size: 10))
                 .foregroundStyle(.red)
-        } else if updater.lastCheckedAt != nil {
+        } else if updater.isUpToDate && updater.lastCheckCompletedAt != nil {
             Text("Up to date")
                 .font(.system(size: 10))
-                .foregroundStyle(.tertiary)
+                .foregroundStyle(.green)
         }
     }
 

@@ -136,9 +136,7 @@ struct ContentView: View {
             if updater.updateAvailable, let latest = updater.latestVersion {
                 UpdateButton(version: latest)
             } else {
-                Text("Version \(appVersion)")
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(.secondary)
+                footerVersionStatus
             }
 
             Button(action: {
@@ -162,6 +160,52 @@ struct ContentView: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 8)
+    }
+
+    private var footerVersionStatus: some View {
+        HStack(spacing: 6) {
+            Button {
+                Task { await updater.checkForUpdates(force: true) }
+            } label: {
+                Image(systemName: updater.isChecking ? "arrow.triangle.2.circlepath.circle.fill" : "arrow.clockwise.circle")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(updater.isChecking ? .tertiary : .secondary)
+                    .frame(width: 14, height: 14)
+                    .contentTransition(.symbolEffect(.replace))
+            }
+            .buttonStyle(.plain)
+            .disabled(updater.isChecking)
+            .help(updater.isChecking ? "Checking for Updates" : "Check for Updates")
+            .onHover { hovering in
+                if hovering && !updater.isChecking { NSCursor.pointingHand.push() }
+                else { NSCursor.pop() }
+            }
+
+            Text("Version \(appVersion)")
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(.secondary)
+
+            footerUpdateStatusText
+        }
+        .animation(.snappy(duration: 0.18), value: updater.isChecking)
+        .animation(.snappy(duration: 0.18), value: updater.lastCheckCompletedAt)
+    }
+
+    @ViewBuilder
+    private var footerUpdateStatusText: some View {
+        if updater.isChecking {
+            Text("Checking")
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(.tertiary)
+        } else if updater.lastError != nil {
+            Text("Check failed")
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(.red)
+        } else if updater.isUpToDate && updater.lastCheckCompletedAt != nil {
+            Text("Up to date")
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(.green)
+        }
     }
 }
 

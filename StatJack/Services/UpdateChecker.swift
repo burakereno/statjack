@@ -12,6 +12,7 @@ final class UpdateChecker {
     private static let assetName = "StatJack.dmg"
     private static let checkInterval: TimeInterval = 2 * 60 * 60
     private static let minimumManualCheckInterval: TimeInterval = 30 * 60
+    private static let minimumVisibleCheckDuration: UInt64 = 500_000_000
 
     private(set) var latestVersion: String?
     private(set) var downloadURL: URL?
@@ -29,8 +30,13 @@ final class UpdateChecker {
         return Self.compare(latest, isNewerThan: currentVersion)
     }
 
+    var isUpToDate: Bool {
+        latestVersion != nil && !updateAvailable && lastError == nil
+    }
+
     private var timer: Timer?
     private(set) var lastCheckedAt: Date?
+    private(set) var lastCheckCompletedAt: Date?
 
     private init() {}
 
@@ -54,7 +60,6 @@ final class UpdateChecker {
         lastCheckedAt = now
         isChecking = true
         lastError = nil
-        defer { isChecking = false }
 
         let url = URL(string: "https://api.github.com/repos/\(Self.owner)/\(Self.repo)/releases/latest")!
         var request = URLRequest(url: url)
@@ -70,6 +75,14 @@ final class UpdateChecker {
         } catch {
             lastError = error.localizedDescription
         }
+
+        let elapsed = Date().timeIntervalSince(now)
+        if elapsed < 0.5 {
+            let remaining = Self.minimumVisibleCheckDuration - UInt64(elapsed * 1_000_000_000)
+            try? await Task.sleep(nanoseconds: remaining)
+        }
+        lastCheckCompletedAt = Date()
+        isChecking = false
     }
 
     func downloadAndInstall() {
