@@ -196,6 +196,9 @@ final class UpdateChecker {
         echo "[install] detaching dmg"
         /usr/bin/hdiutil detach "$MOUNT_POINT" -quiet -force 2>/dev/null
 
+        echo "[install] removing downloaded dmg"
+        rm -f "$DMG"
+
         echo "[install] launching new app"
         /usr/bin/open "$TARGET"
 
