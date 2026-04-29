@@ -129,12 +129,9 @@ final class UpdateChecker {
 
     private func installUpdate(dmgURL: URL) {
         let currentBundle = URL(fileURLWithPath: Bundle.main.bundlePath)
-
-        // Dev builds (DerivedData etc.) — skip auto-install
-        guard currentBundle.path.hasPrefix("/Applications/") else {
-            NSWorkspace.shared.open(dmgURL)
-            return
-        }
+        let targetBundle = currentBundle.path.hasPrefix("/Applications/")
+            ? currentBundle
+            : URL(fileURLWithPath: "/Applications/StatJack.app")
 
         let scriptURL = URL(fileURLWithPath: NSTemporaryDirectory())
             .appendingPathComponent("statjack-install-\(UUID().uuidString).sh")
@@ -148,7 +145,7 @@ final class UpdateChecker {
 
         PARENT_PID="$1"
         DMG="$2"
-        TARGET="\(currentBundle.path)"
+        TARGET="\(targetBundle.path)"
 
         echo "[install] waiting for parent $PARENT_PID to exit"
         for _ in $(seq 1 50); do
@@ -207,8 +204,8 @@ final class UpdateChecker {
 
         let pid = ProcessInfo.processInfo.processIdentifier
         let task = Process()
-        task.launchPath = "/bin/bash"
-        task.arguments = ["-c", "nohup \(scriptURL.path) \(pid) \(dmgURL.path) >/dev/null 2>&1 &"]
+        task.executableURL = scriptURL
+        task.arguments = ["\(pid)", dmgURL.path]
         do {
             try task.run()
         } catch {
