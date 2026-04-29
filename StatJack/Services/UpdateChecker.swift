@@ -30,7 +30,7 @@ final class UpdateChecker {
     }
 
     private var timer: Timer?
-    private var lastCheckedAt: Date?
+    private(set) var lastCheckedAt: Date?
 
     private init() {}
 

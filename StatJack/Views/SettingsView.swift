@@ -59,10 +59,6 @@ struct SettingsView: View {
 
                     Divider().opacity(0.2).padding(.vertical, 2)
 
-                    refreshIntervalRow()
-
-                    Divider().opacity(0.2).padding(.vertical, 2)
-
                     toggleRow(
                         title: "CPU Usage",
                         subtitle: "e.g. 23%",
@@ -146,8 +142,20 @@ struct SettingsView: View {
                 }
             }
 
+            // Refresh
+            MetricCardView(title: "Refresh", systemImage: "timer", showIcon: false) {
+                refreshIntervalRow()
+            }
+
             // About
-            MetricCardView(title: "About", systemImage: AppIcons.about, showIcon: false) {
+            MetricCardView(
+                title: "About",
+                systemImage: AppIcons.about,
+                showIcon: false,
+                headerAccessory: {
+                    updateCheckButton
+                }
+            ) {
                 HStack {
                     VStack(alignment: .leading, spacing: 4) {
                         HStack {
@@ -160,6 +168,7 @@ struct SettingsView: View {
                         Text("Lightweight system monitor for macOS")
                             .font(.system(size: 11))
                             .foregroundStyle(.secondary)
+                        updateStatusText
                     }
                     Spacer()
                     if updater.updateAvailable, let latest = updater.latestVersion {
@@ -170,19 +179,64 @@ struct SettingsView: View {
         }
     }
 
+    private var updateCheckButton: some View {
+        Button {
+            Task { await updater.checkForUpdates(force: true) }
+        } label: {
+            Text(updater.isChecking ? "Checking" : "Check")
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(updater.isChecking ? .tertiary : .secondary)
+                .frame(width: 74, height: 24)
+                .background {
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(Color.primary.opacity(updater.isChecking ? 0.035 : 0.06))
+                }
+        }
+        .buttonStyle(.plain)
+        .frame(width: 74, height: 24)
+        .contentShape(Rectangle())
+        .disabled(updater.isChecking)
+        .help(updater.isChecking ? "Checking for Updates" : "Check for Updates")
+        .onHover { hovering in
+            if hovering && !updater.isChecking { NSCursor.pointingHand.push() }
+            else { NSCursor.pop() }
+        }
+    }
+
+    @ViewBuilder
+    private var updateStatusText: some View {
+        if updater.isChecking {
+            Text("Checking for updates...")
+                .font(.system(size: 10))
+                .foregroundStyle(.tertiary)
+        } else if updater.updateAvailable, let latest = updater.latestVersion {
+            Text("Version \(latest) available")
+                .font(.system(size: 10))
+                .foregroundStyle(.orange)
+        } else if updater.lastError != nil {
+            Text("Update check failed")
+                .font(.system(size: 10))
+                .foregroundStyle(.red)
+        } else if updater.lastCheckedAt != nil {
+            Text("Up to date")
+                .font(.system(size: 10))
+                .foregroundStyle(.tertiary)
+        }
+    }
+
     // MARK: - Refresh Interval Row
 
     private func refreshIntervalRow() -> some View {
-        HStack(alignment: .center, spacing: 10) {
+        HStack(alignment: .top, spacing: 10) {
             Image(systemName: "timer")
                 .font(.system(size: 14, weight: .regular))
                 .foregroundStyle(.secondary)
                 .frame(width: 20, alignment: .center)
 
             VStack(alignment: .leading, spacing: 1) {
-                Text("Refresh")
+                Text("Menu Bar Refresh")
                     .font(.system(size: 12, weight: .medium))
-                Text("When popover is closed")
+                Text("Update visible menu bar metrics when StatJack is closed")
                     .font(.system(size: 10))
                     .foregroundStyle(.tertiary)
             }
@@ -194,9 +248,9 @@ struct SettingsView: View {
                 }
             }
             .labelsHidden()
-            .pickerStyle(.segmented)
+            .pickerStyle(.menu)
             .controlSize(.small)
-            .frame(width: 116)
+            .frame(width: 86)
         }
         .padding(.vertical, 4)
     }
@@ -204,7 +258,7 @@ struct SettingsView: View {
     // MARK: - Dock Badge Metric Row
 
     private func dockBadgeMetricRow(disabled: Bool = false) -> some View {
-        HStack(alignment: .center, spacing: 10) {
+        HStack(alignment: .top, spacing: 10) {
             Image(systemName: icon(for: settings.dockBadgeMetric))
                 .font(.system(size: 14, weight: .regular))
                 .foregroundStyle(disabled ? .tertiary : .secondary)
@@ -256,7 +310,7 @@ struct SettingsView: View {
         isOn: Binding<Bool>,
         disabled: Bool = false
     ) -> some View {
-        HStack(alignment: .center, spacing: 10) {
+        HStack(alignment: .top, spacing: 10) {
             Image(systemName: icon)
                 .font(.system(size: 14, weight: .regular))
                 .foregroundStyle(disabled ? .tertiary : .secondary)
@@ -303,7 +357,7 @@ struct SettingsView: View {
         threshold: Binding<Double>
     ) -> some View {
         VStack(spacing: 4) {
-            HStack(alignment: .center, spacing: 10) {
+            HStack(alignment: .top, spacing: 10) {
                 Image(systemName: icon)
                     .font(.system(size: 14, weight: .regular))
                     .foregroundStyle(.secondary)
