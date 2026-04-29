@@ -15,7 +15,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     private var isDockBadgeVisible = false
     private var statusSymbolCache: [String: NSImage] = [:]
 
-    private let idleInterval: TimeInterval = 10.0
     private let activeInterval: TimeInterval = 2.0
     private let statusSymbolConfig = NSImage.SymbolConfiguration(
         pointSize: MenuBarDisplay.metricIconPointSize,
@@ -158,7 +157,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     private func updateMonitoringMode() {
         let useActiveMonitoring = popover.isShown && !isSettingsVisible
         monitor.startMonitoring(
-            interval: useActiveMonitoring ? activeInterval : idleInterval,
+            interval: useActiveMonitoring ? activeInterval : AppSettings.shared.menuBarRefreshInterval.rawValue,
             collectAllMetrics: useActiveMonitoring
         )
     }

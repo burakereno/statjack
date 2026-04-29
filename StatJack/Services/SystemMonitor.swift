@@ -77,7 +77,7 @@ final class SystemMonitor {
     init() {
         bootDate = Self.loadBootDate()
         tick()
-        startMonitoring(interval: 10.0)
+        startMonitoring(interval: AppSettings.shared.menuBarRefreshInterval.rawValue)
     }
 
     deinit {

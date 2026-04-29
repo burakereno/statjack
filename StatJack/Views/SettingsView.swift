@@ -59,6 +59,10 @@ struct SettingsView: View {
 
                     Divider().opacity(0.2).padding(.vertical, 2)
 
+                    refreshIntervalRow()
+
+                    Divider().opacity(0.2).padding(.vertical, 2)
+
                     toggleRow(
                         title: "CPU Usage",
                         subtitle: "e.g. 23%",
@@ -164,6 +168,37 @@ struct SettingsView: View {
                 }
             }
         }
+    }
+
+    // MARK: - Refresh Interval Row
+
+    private func refreshIntervalRow() -> some View {
+        HStack(alignment: .center, spacing: 10) {
+            Image(systemName: "timer")
+                .font(.system(size: 14, weight: .regular))
+                .foregroundStyle(.secondary)
+                .frame(width: 20, alignment: .center)
+
+            VStack(alignment: .leading, spacing: 1) {
+                Text("Refresh")
+                    .font(.system(size: 12, weight: .medium))
+                Text("When popover is closed")
+                    .font(.system(size: 10))
+                    .foregroundStyle(.tertiary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            Picker("", selection: $settings.menuBarRefreshInterval) {
+                ForEach(MenuBarRefreshInterval.allCases) { interval in
+                    Text(interval.title).tag(interval)
+                }
+            }
+            .labelsHidden()
+            .pickerStyle(.segmented)
+            .controlSize(.small)
+            .frame(width: 116)
+        }
+        .padding(.vertical, 4)
     }
 
     // MARK: - Dock Badge Metric Row

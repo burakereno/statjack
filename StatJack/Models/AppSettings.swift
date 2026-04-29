@@ -28,6 +28,18 @@ enum DockBadgeMetric: String, CaseIterable, Identifiable {
     }
 }
 
+enum MenuBarRefreshInterval: Double, CaseIterable, Identifiable {
+    case five = 5
+    case ten = 10
+    case fifteen = 15
+
+    var id: Double { rawValue }
+
+    var title: String {
+        "\(Int(rawValue))s"
+    }
+}
+
 /// Persistent app settings with native toggle support
 @Observable
 final class AppSettings {
@@ -112,6 +124,14 @@ final class AppSettings {
     var dockBadgeMetric: DockBadgeMetric {
         didSet {
             UserDefaults.standard.set(dockBadgeMetric.rawValue, forKey: "dockBadgeMetric")
+            notifyChanged()
+        }
+    }
+
+    /// Menu bar refresh interval while the popover is closed
+    var menuBarRefreshInterval: MenuBarRefreshInterval {
+        didSet {
+            UserDefaults.standard.set(menuBarRefreshInterval.rawValue, forKey: "menuBarRefreshInterval")
             notifyChanged()
         }
     }
@@ -207,6 +227,8 @@ final class AppSettings {
         self.showDockBadge = defaults.object(forKey: "showDockBadge") as? Bool ?? false
         let dockBadgeMetricRaw = defaults.string(forKey: "dockBadgeMetric")
         self.dockBadgeMetric = dockBadgeMetricRaw.flatMap(DockBadgeMetric.init(rawValue:)) ?? .cpu
+        let refreshIntervalRaw = defaults.object(forKey: "menuBarRefreshInterval") as? Double
+        self.menuBarRefreshInterval = refreshIntervalRaw.flatMap(MenuBarRefreshInterval.init(rawValue:)) ?? .ten
         self.launchAtLogin = Self.isLaunchAtLoginEnabled
         self.cpuAlertEnabled = defaults.object(forKey: "cpuAlertEnabled") as? Bool ?? false
         self.cpuAlertThreshold = defaults.object(forKey: "cpuAlertThreshold") as? Double ?? 90
