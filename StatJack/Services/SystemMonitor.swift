@@ -68,7 +68,7 @@ final class SystemMonitor {
     @ObservationIgnored
     private var lastDiskSample: Date?
     @ObservationIgnored
-    private let diskSampleInterval: TimeInterval = 60
+    private let diskSampleInterval: TimeInterval = 300
     @ObservationIgnored
     private let sampleQueue = DispatchQueue(label: "com.statjack.monitor.samples", qos: .utility)
     @ObservationIgnored
