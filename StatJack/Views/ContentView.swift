@@ -5,6 +5,7 @@ struct ContentView: View {
     let monitor: SystemMonitor
     let onSettingsVisibilityChanged: (Bool) -> Void
     @State private var showSettings = false
+    @State private var showFooterUpToDate = false
     @Bindable private var updater = UpdateChecker.shared
 
     private var appVersion: String {
@@ -184,11 +185,21 @@ struct ContentView: View {
             Text("Version \(appVersion)")
                 .font(.system(size: 10, weight: .semibold))
                 .foregroundStyle(.secondary)
-
-            footerUpdateStatusText
+                .opacity(showFooterUpToDate || updater.isChecking ? 0 : 1)
+                .overlay(alignment: .leading) {
+                    footerUpdateStatusText
+                }
         }
         .animation(.snappy(duration: 0.18), value: updater.isChecking)
         .animation(.snappy(duration: 0.18), value: updater.lastCheckCompletedAt)
+        .onChange(of: updater.lastCheckCompletedAt) { _, _ in
+            guard updater.isUpToDate else { return }
+            Task {
+                showFooterUpToDate = true
+                try? await Task.sleep(nanoseconds: 1_000_000_000)
+                showFooterUpToDate = false
+            }
+        }
     }
 
     @ViewBuilder
@@ -201,7 +212,7 @@ struct ContentView: View {
             Text("Check failed")
                 .font(.system(size: 10, weight: .semibold))
                 .foregroundStyle(.red)
-        } else if updater.isUpToDate && updater.lastCheckCompletedAt != nil {
+        } else if showFooterUpToDate {
             Text("Up to date")
                 .font(.system(size: 10, weight: .semibold))
                 .foregroundStyle(.green)
