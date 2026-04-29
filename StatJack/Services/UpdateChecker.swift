@@ -11,6 +11,7 @@ final class UpdateChecker {
     private static let repo = "statjack"
     private static let assetName = "StatJack.dmg"
     private static let checkInterval: TimeInterval = 2 * 60 * 60
+    private static let minimumManualCheckInterval: TimeInterval = 30 * 60
 
     private(set) var latestVersion: String?
     private(set) var downloadURL: URL?
@@ -29,19 +30,28 @@ final class UpdateChecker {
     }
 
     private var timer: Timer?
+    private var lastCheckedAt: Date?
 
     private init() {}
 
     func start() {
-        Task { await checkForUpdates() }
+        Task { await checkForUpdates(force: true) }
         timer?.invalidate()
         timer = Timer.scheduledTimer(withTimeInterval: Self.checkInterval, repeats: true) { _ in
-            Task { @MainActor in await UpdateChecker.shared.checkForUpdates() }
+            Task { @MainActor in await UpdateChecker.shared.checkForUpdates(force: true) }
         }
     }
 
-    func checkForUpdates() async {
+    func checkForUpdates(force: Bool = false) async {
         guard !isChecking else { return }
+        let now = Date()
+        if !force,
+           let lastCheckedAt,
+           now.timeIntervalSince(lastCheckedAt) < Self.minimumManualCheckInterval
+        {
+            return
+        }
+        lastCheckedAt = now
         isChecking = true
         lastError = nil
         defer { isChecking = false }

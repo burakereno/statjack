@@ -10,14 +10,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     private var eventMonitor: Any?
     private var lastMenuBarState: MenuBarState?
     private var currentActivationPolicy: NSApplication.ActivationPolicy?
+    private var isSettingsVisible = false
+    private var lastDockBadgeLabel: String?
+    private var isDockBadgeVisible = false
+    private var statusSymbolCache: [String: NSImage] = [:]
 
-    private let idleInterval: TimeInterval = 5.0
+    private let idleInterval: TimeInterval = 10.0
     private let activeInterval: TimeInterval = 2.0
+    private let statusSymbolConfig = NSImage.SymbolConfiguration(
+        pointSize: MenuBarDisplay.metricIconPointSize,
+        weight: .medium
+    )
+    private let statusFont = NSFont.monospacedSystemFont(
+        ofSize: MenuBarDisplay.metricTextPointSize,
+        weight: .medium
+    )
 
     private struct MenuBarState: Equatable {
         let iconOnly: Bool
         let showCPU: Bool
         let showRAM: Bool
+        let showDisk: Bool
         let showNetwork: Bool
         let segments: [MenuBarMetricSegment]
     }
@@ -34,10 +47,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         popover.behavior = .transient
         popover.delegate = self
         popover.appearance = NSAppearance(named: .darkAqua)
-        popover.contentSize = NSSize(width: 320, height: 440)
+        popover.contentSize = NSSize(width: 320, height: 572)
         popover.contentViewController = NSHostingController(
-            rootView: ContentView(monitor: monitor)
-                .frame(width: 320, height: 440)
+            rootView: ContentView(
+                monitor: monitor,
+                onSettingsVisibilityChanged: { [weak self] visible in
+                    self?.settingsVisibilityChanged(visible)
+                }
+            )
+                .frame(width: 320, height: 572)
         )
 
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -84,10 +102,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         if popover.isShown {
             closePopover()
         } else {
-            monitor.startMonitoring(interval: activeInterval, collectAllMetrics: true)
-            monitor.refreshNow()
             NSApp.activate(ignoringOtherApps: true)
             popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+            updateMonitoringMode()
+            monitor.refreshNow()
             focusPopoverWindow()
             startEventMonitor()
             Task { await UpdateChecker.shared.checkForUpdates() }
@@ -112,6 +130,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         monitor.refreshNow()
     }
 
+    private func settingsVisibilityChanged(_ visible: Bool) {
+        guard isSettingsVisible != visible else { return }
+        isSettingsVisible = visible
+        updateMonitoringMode()
+        monitor.refreshNow()
+    }
+
     // MARK: - Event Monitor (close on outside click)
 
     private func startEventMonitor() {
@@ -131,9 +156,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     }
 
     private func updateMonitoringMode() {
+        let useActiveMonitoring = popover.isShown && !isSettingsVisible
         monitor.startMonitoring(
-            interval: popover.isShown ? activeInterval : idleInterval,
-            collectAllMetrics: popover.isShown
+            interval: useActiveMonitoring ? activeInterval : idleInterval,
+            collectAllMetrics: useActiveMonitoring
         )
     }
 
@@ -152,13 +178,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     private func updateDockBadge() {
         let settings = AppSettings.shared
         guard settings.showDockIcon, settings.showDockBadge else {
+            guard isDockBadgeVisible || lastDockBadgeLabel != nil else { return }
             NSApp.dockTile.badgeLabel = nil
             NSApp.dockTile.contentView = nil
+            lastDockBadgeLabel = nil
+            isDockBadgeVisible = false
             return
         }
 
+        let label = dockBadgeLabel(for: settings.dockBadgeMetric)
+        guard !isDockBadgeVisible || lastDockBadgeLabel != label else { return }
+        lastDockBadgeLabel = label
+        isDockBadgeVisible = true
+
         NSApp.dockTile.badgeLabel = nil
-        NSApp.dockTile.contentView = DockBadgeView(label: dockBadgeLabel(for: settings.dockBadgeMetric))
+        NSApp.dockTile.contentView = DockBadgeView(label: label)
         NSApp.dockTile.display()
     }
 
@@ -190,6 +224,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             iconOnly: settings.iconOnly,
             showCPU: settings.showCPU,
             showRAM: settings.showRAM,
+            showDisk: settings.showDisk,
             showNetwork: settings.showNetwork,
             showGPU: settings.showGPU,
             showTemperature: settings.showTemperature
@@ -198,11 +233,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             iconOnly: settings.iconOnly,
             showCPU: settings.showCPU,
             showRAM: settings.showRAM,
+            showDisk: settings.showDisk,
             showNetwork: settings.showNetwork,
             showGPU: settings.showGPU,
             showTemperature: settings.showTemperature,
             cpu: monitor.menuBarCPU,
             ram: monitor.menuBarRAM,
+            disk: monitor.menuBarDisk,
             net: monitor.menuBarNet,
             gpu: monitor.menuBarGPU,
             temp: monitor.menuBarTemp
@@ -211,6 +248,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             iconOnly: showIconOnly,
             showCPU: settings.showCPU,
             showRAM: settings.showRAM,
+            showDisk: settings.showDisk,
             showNetwork: settings.showNetwork,
             segments: segments
         )
@@ -239,12 +277,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     private func renderStatusImage(segments: [MenuBarMetricSegment]) -> NSImage {
         let w = MenuBarDisplay.contentWidth(for: segments)
         let h = MenuBarDisplay.statusHeight
-        let font = NSFont.monospacedSystemFont(
-            ofSize: MenuBarDisplay.metricTextPointSize,
-            weight: .medium
-        )
         let attrs: [NSAttributedString.Key: Any] = [
-            .font: font,
+            .font: statusFont,
             .foregroundColor: NSColor.black
         ]
 
@@ -273,14 +307,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     }
 
     private func drawSymbol(_ symbolName: String, x: CGFloat, canvasHeight: CGFloat) {
-        let config = NSImage.SymbolConfiguration(
-            pointSize: MenuBarDisplay.metricIconPointSize,
-            weight: .medium
-        )
-        guard let symbol = NSImage(
+        let symbol: NSImage
+        if let cached = statusSymbolCache[symbolName] {
+            symbol = cached
+        } else if let image = NSImage(
             systemSymbolName: symbolName,
             accessibilityDescription: nil
-        )?.withSymbolConfiguration(config) else { return }
+        )?.withSymbolConfiguration(statusSymbolConfig) {
+            statusSymbolCache[symbolName] = image
+            symbol = image
+        } else {
+            return
+        }
 
         let symbolSize = symbol.size
         let rect = NSRect(

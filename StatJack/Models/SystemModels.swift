@@ -15,6 +15,21 @@ struct MemoryUsage {
     }
 }
 
+/// Root filesystem usage
+struct DiskUsage {
+    let total: UInt64
+    let available: UInt64
+
+    var used: UInt64 {
+        total > available ? total - available : 0
+    }
+
+    var usedPercentage: Double {
+        guard total > 0 else { return 0 }
+        return Double(used) / Double(total) * 100
+    }
+}
+
 /// System-wide network throughput
 struct NetworkUsage {
     let uploadSpeed: Double    // bytes per second
@@ -50,7 +65,11 @@ struct NetworkSample {
 struct SystemSample {
     let cpu: CPUSample?
     let memory: MemoryUsage?
+    let disk: DiskUsage?
+    let diskSampled: Bool
     let network: NetworkSample?
     let gpuUtilization: Double?
+    let gpuSampled: Bool
     let thermal: ThermalReading?
+    let thermalSampled: Bool
 }

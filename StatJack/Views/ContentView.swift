@@ -3,6 +3,7 @@ import SwiftUI
 /// Main content view — single scrollable dashboard, no tabs
 struct ContentView: View {
     let monitor: SystemMonitor
+    let onSettingsVisibilityChanged: (Bool) -> Void
     @State private var showSettings = false
     @Bindable private var updater = UpdateChecker.shared
 
@@ -33,10 +34,10 @@ struct ContentView: View {
                     // All stats in one scroll
                     ScrollView {
                         VStack(spacing: 10) {
-                            PublicIPRow()
                             SummaryRibbonView(monitor: monitor)
                             CPUView(monitor: monitor)
                             MemoryView(monitor: monitor)
+                            DiskView(monitor: monitor)
                             NetworkView(monitor: monitor)
                             GPUView(monitor: monitor)
                             ThermalView(monitor: monitor)
@@ -54,6 +55,9 @@ struct ContentView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .clipped()
             .animation(.snappy(duration: 0.24), value: showSettings)
+            .onChange(of: showSettings) { _, newValue in
+                onSettingsVisibilityChanged(newValue)
+            }
 
             Divider().opacity(0.5)
 
@@ -166,7 +170,7 @@ private struct SummaryRibbonView: View {
 
     private let columns = Array(
         repeating: GridItem(.flexible(minimum: 0), spacing: 5),
-        count: 5
+        count: 3
     )
 
     var body: some View {
@@ -180,6 +184,7 @@ private struct SummaryRibbonView: View {
     private var metrics: [SummaryMetric] {
         let cpuUsage = monitor.cpuMonitor.totalUsage
         let ramUsage = monitor.memoryMonitor.memoryUsage.usedPercentage
+        let diskUsage = monitor.diskMonitor.diskUsage.usedPercentage
         let networkUsage = monitor.networkMonitor.networkUsage
         let gpuUsage = monitor.gpuMonitor.utilization
         let thermalReading = monitor.thermalMonitor.reading
@@ -198,6 +203,13 @@ private struct SummaryRibbonView: View {
                 value: "\(Int(ramUsage))%",
                 systemImage: AppIcons.ram,
                 color: AppColors.usageColor(for: ramUsage)
+            ),
+            SummaryMetric(
+                id: "disk",
+                label: "DISK",
+                value: "\(Int(diskUsage))%",
+                systemImage: AppIcons.disk,
+                color: AppColors.usageColor(for: diskUsage)
             ),
             SummaryMetric(
                 id: "network",

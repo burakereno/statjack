@@ -27,22 +27,25 @@ enum MenuBarDisplay {
         iconOnly: Bool,
         showCPU: Bool,
         showRAM: Bool,
+        showDisk: Bool,
         showNetwork: Bool,
         showGPU: Bool,
         showTemperature: Bool
     ) -> Bool {
-        iconOnly || (!showCPU && !showRAM && !showNetwork && !showGPU && !showTemperature)
+        iconOnly || (!showCPU && !showRAM && !showDisk && !showNetwork && !showGPU && !showTemperature)
     }
 
     static func metricSegments(
         iconOnly: Bool,
         showCPU: Bool,
         showRAM: Bool,
+        showDisk: Bool,
         showNetwork: Bool,
         showGPU: Bool,
         showTemperature: Bool,
         cpu: String,
         ram: String,
+        disk: String,
         net: String,
         gpu: String,
         temp: String
@@ -51,6 +54,7 @@ enum MenuBarDisplay {
             iconOnly: iconOnly,
             showCPU: showCPU,
             showRAM: showRAM,
+            showDisk: showDisk,
             showNetwork: showNetwork,
             showGPU: showGPU,
             showTemperature: showTemperature
@@ -67,6 +71,12 @@ enum MenuBarDisplay {
             segments.append(MenuBarMetricSegment(
                 id: "ram", symbolName: AppIcons.ram, text: ram,
                 width: textSegmentWidth(for: ram)
+            ))
+        }
+        if showDisk {
+            segments.append(MenuBarMetricSegment(
+                id: "disk", symbolName: AppIcons.disk, text: disk,
+                width: textSegmentWidth(for: disk)
             ))
         }
         if showNetwork {
@@ -109,9 +119,11 @@ struct MenuBarContentView: View {
     let iconOnly: Bool
     let showCPU: Bool
     let showRAM: Bool
+    let showDisk: Bool
     let showNetwork: Bool
     let cpu: String
     let ram: String
+    let disk: String
     let net: String
 
     private var showIconOnly: Bool {
@@ -119,6 +131,7 @@ struct MenuBarContentView: View {
             iconOnly: iconOnly,
             showCPU: showCPU,
             showRAM: showRAM,
+            showDisk: showDisk,
             showNetwork: showNetwork,
             showGPU: false,
             showTemperature: false
@@ -130,11 +143,13 @@ struct MenuBarContentView: View {
             iconOnly: iconOnly,
             showCPU: showCPU,
             showRAM: showRAM,
+            showDisk: showDisk,
             showNetwork: showNetwork,
             showGPU: false,
             showTemperature: false,
             cpu: cpu,
             ram: ram,
+            disk: disk,
             net: net,
             gpu: "",
             temp: ""

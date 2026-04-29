@@ -1,17 +1,25 @@
 import SwiftUI
 
 /// A card showing a metric with title, value, and usage bar
-struct MetricCardView<Content: View>: View {
+struct MetricCardView<Content: View, HeaderAccessory: View>: View {
     let title: String
     let systemImage: String
     let showIcon: Bool
+    let headerAccessory: () -> HeaderAccessory
     let content: () -> Content
     @Environment(\.colorScheme) private var colorScheme
 
-    init(title: String, systemImage: String, showIcon: Bool = true, @ViewBuilder content: @escaping () -> Content) {
+    init(
+        title: String,
+        systemImage: String,
+        showIcon: Bool = true,
+        @ViewBuilder headerAccessory: @escaping () -> HeaderAccessory,
+        @ViewBuilder content: @escaping () -> Content
+    ) {
         self.title = title
         self.systemImage = systemImage
         self.showIcon = showIcon
+        self.headerAccessory = headerAccessory
         self.content = content
     }
 
@@ -30,6 +38,10 @@ struct MetricCardView<Content: View>: View {
                     .foregroundStyle(headerForeground)
                     .textCase(.uppercase)
                     .tracking(0.5)
+
+                Spacer(minLength: 8)
+
+                headerAccessory()
             }
 
             content()
@@ -71,4 +83,10 @@ struct MetricCardView<Content: View>: View {
         return Color(nsColor: .tertiaryLabelColor)
     }
 
+}
+
+extension MetricCardView where HeaderAccessory == EmptyView {
+    init(title: String, systemImage: String, showIcon: Bool = true, @ViewBuilder content: @escaping () -> Content) {
+        self.init(title: title, systemImage: systemImage, showIcon: showIcon, headerAccessory: { EmptyView() }, content: content)
+    }
 }

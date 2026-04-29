@@ -9,6 +9,7 @@ import UserNotifications
 final class SystemMonitor {
     let cpuMonitor = CPUMonitor()
     let memoryMonitor = MemoryMonitor()
+    let diskMonitor = DiskMonitor()
     let networkMonitor = NetworkMonitor()
     let gpuMonitor = GPUMonitor()
     let thermalMonitor = ThermalMonitor()
@@ -19,6 +20,7 @@ final class SystemMonitor {
     /// Individual menu bar display values
     var menuBarCPU: String = "0%"
     var menuBarRAM: String = "0%"
+    var menuBarDisk: String = "0%"
     var menuBarNet: String = "↑0K ↓0K"
     var menuBarGPU: String = "--"
     var menuBarTemp: String = "--"
@@ -27,6 +29,7 @@ final class SystemMonitor {
     /// Capped at `historyCapacity` entries; appended on every tick.
     var cpuHistory: [Double] = []
     var ramHistory: [Double] = []
+    var diskHistory: [Double] = []
     var netUploadHistory: [Double] = []
     var netDownloadHistory: [Double] = []
     var gpuHistory: [Double] = []
@@ -40,7 +43,13 @@ final class SystemMonitor {
     @ObservationIgnored
     private var lastRAMAlert: Date?
     @ObservationIgnored
+    private var cpuAlertSnoozed = false
+    @ObservationIgnored
+    private var ramAlertSnoozed = false
+    @ObservationIgnored
     private let alertCooldown: TimeInterval = 300
+    @ObservationIgnored
+    private let alertResetMargin: Double = 5
 
     @ObservationIgnored
     private var timer: Timer?
@@ -53,6 +62,14 @@ final class SystemMonitor {
     @ObservationIgnored
     private var pendingRefresh = false
     @ObservationIgnored
+    private var lastThermalSample: Date?
+    @ObservationIgnored
+    private let thermalSampleInterval: TimeInterval = 15
+    @ObservationIgnored
+    private var lastDiskSample: Date?
+    @ObservationIgnored
+    private let diskSampleInterval: TimeInterval = 60
+    @ObservationIgnored
     private let sampleQueue = DispatchQueue(label: "com.statjack.monitor.samples", qos: .utility)
     @ObservationIgnored
     private let bootDate: Date?
@@ -60,7 +77,7 @@ final class SystemMonitor {
     init() {
         bootDate = Self.loadBootDate()
         tick()
-        startMonitoring(interval: 5.0)
+        startMonitoring(interval: 10.0)
     }
 
     deinit {
@@ -106,7 +123,9 @@ final class SystemMonitor {
         isUpdating = true
 
         let selection = metricSelection()
-        guard selection.cpu || selection.memory || selection.network || selection.extras else {
+        let sampleThermal = selection.temperature && shouldSampleThermal()
+        let sampleDisk = selection.disk && shouldSampleDisk()
+        guard selection.cpu || selection.memory || sampleDisk || selection.network || selection.gpu || sampleThermal else {
             updateUptime()
             isUpdating = false
             runPendingRefreshIfNeeded()
@@ -117,9 +136,13 @@ final class SystemMonitor {
             let sample = SystemSample(
                 cpu: selection.cpu ? CPUMonitor.sample() : nil,
                 memory: selection.memory ? MemoryMonitor.sample() : nil,
+                disk: sampleDisk ? DiskMonitor.sample() : nil,
+                diskSampled: sampleDisk,
                 network: selection.network ? NetworkMonitor.sample() : nil,
-                gpuUtilization: selection.extras ? GPUMonitor.sample() : nil,
-                thermal: selection.extras ? ThermalMonitor.sample() : nil
+                gpuUtilization: selection.gpu ? GPUMonitor.sample() : nil,
+                gpuSampled: selection.gpu,
+                thermal: sampleThermal ? ThermalMonitor.sample() : nil,
+                thermalSampled: sampleThermal
             )
 
             DispatchQueue.main.async { [weak self] in
@@ -138,19 +161,44 @@ final class SystemMonitor {
         tick()
     }
 
-    private func metricSelection() -> (cpu: Bool, memory: Bool, network: Bool, extras: Bool) {
-        guard !collectAllMetrics else { return (true, true, true, true) }
+    private func shouldSampleThermal() -> Bool {
+        let now = Date()
+        if let lastThermalSample,
+           now.timeIntervalSince(lastThermalSample) < thermalSampleInterval
+        {
+            return false
+        }
+        lastThermalSample = now
+        return true
+    }
+
+    private func shouldSampleDisk() -> Bool {
+        let now = Date()
+        if let lastDiskSample,
+           now.timeIntervalSince(lastDiskSample) < diskSampleInterval
+        {
+            return false
+        }
+        lastDiskSample = now
+        return true
+    }
+
+    private func metricSelection() -> (cpu: Bool, memory: Bool, disk: Bool, network: Bool, gpu: Bool, temperature: Bool) {
+        guard !collectAllMetrics else { return (true, true, true, true, true, true) }
 
         let settings = AppSettings.shared
         let dockMetric = settings.showDockIcon && settings.showDockBadge ? settings.dockBadgeMetric : nil
         let needsDockCPU = dockMetric == .cpu
         let needsDockMemory = dockMetric == .ram
-        let needsDockExtras = dockMetric == .gpu || dockMetric == .temperature
+        let needsDockGPU = dockMetric == .gpu
+        let needsDockTemperature = dockMetric == .temperature
         let needsCPU = (!settings.iconOnly && settings.showCPU) || settings.cpuAlertEnabled || needsDockCPU
         let needsMemory = (!settings.iconOnly && settings.showRAM) || settings.ramAlertEnabled || needsDockMemory
+        let needsDisk = !settings.iconOnly && settings.showDisk
         let needsNetwork = !settings.iconOnly && settings.showNetwork
-        let needsExtras = (!settings.iconOnly && (settings.showGPU || settings.showTemperature)) || needsDockExtras
-        return (needsCPU, needsMemory, needsNetwork, needsExtras)
+        let needsGPU = (!settings.iconOnly && settings.showGPU) || needsDockGPU
+        let needsTemperature = (!settings.iconOnly && settings.showTemperature) || needsDockTemperature
+        return (needsCPU, needsMemory, needsDisk, needsNetwork, needsGPU, needsTemperature)
     }
 
     private func apply(_ sample: SystemSample) {
@@ -168,6 +216,12 @@ final class SystemMonitor {
             checkRAMAlert(memoryMonitor.memoryUsage.usedPercentage)
         }
 
+        if sample.diskSampled, let disk = sample.disk {
+            diskMonitor.apply(disk)
+            menuBarDisk = "\(Int(diskMonitor.diskUsage.usedPercentage))%"
+            appendHistory(&diskHistory, value: diskMonitor.diskUsage.usedPercentage)
+        }
+
         if let network = sample.network {
             networkMonitor.apply(network)
             let up = Formatters.formatSpeedCompact(networkMonitor.networkUsage.uploadSpeed)
@@ -177,20 +231,24 @@ final class SystemMonitor {
             appendHistory(&netDownloadHistory, value: networkMonitor.networkUsage.downloadSpeed)
         }
 
-        gpuMonitor.apply(sample.gpuUtilization)
-        if let g = sample.gpuUtilization {
-            appendHistory(&gpuHistory, value: g)
-            menuBarGPU = "\(Int(g))%"
-        } else {
-            menuBarGPU = "--"
+        if sample.gpuSampled {
+            gpuMonitor.apply(sample.gpuUtilization)
+            if let g = sample.gpuUtilization {
+                appendHistory(&gpuHistory, value: g)
+                menuBarGPU = "\(Int(g))%"
+            } else {
+                menuBarGPU = "--"
+            }
         }
 
-        thermalMonitor.apply(sample.thermal)
-        if let t = sample.thermal {
-            appendHistory(&tempHistory, value: t.average)
-            menuBarTemp = "\(Int(t.average))°"
-        } else {
-            menuBarTemp = "--"
+        if sample.thermalSampled {
+            thermalMonitor.apply(sample.thermal)
+            if let t = sample.thermal {
+                appendHistory(&tempHistory, value: t.average)
+                menuBarTemp = "\(Int(t.average))°"
+            } else {
+                menuBarTemp = "--"
+            }
         }
 
         updateUptime()
@@ -205,9 +263,18 @@ final class SystemMonitor {
 
     private func checkCPUAlert(_ value: Double) {
         let s = AppSettings.shared
-        guard s.cpuAlertEnabled, value >= s.cpuAlertThreshold else { return }
+        guard s.cpuAlertEnabled else {
+            cpuAlertSnoozed = false
+            return
+        }
+        if value < max(0, s.cpuAlertThreshold - alertResetMargin) {
+            cpuAlertSnoozed = false
+            return
+        }
+        guard value >= s.cpuAlertThreshold, !cpuAlertSnoozed else { return }
         if let last = lastCPUAlert, Date().timeIntervalSince(last) < alertCooldown { return }
         lastCPUAlert = Date()
+        cpuAlertSnoozed = true
         Self.postAlert(
             title: "High CPU Usage",
             body: "CPU at \(Int(value))% (threshold \(Int(s.cpuAlertThreshold))%)"
@@ -216,9 +283,18 @@ final class SystemMonitor {
 
     private func checkRAMAlert(_ value: Double) {
         let s = AppSettings.shared
-        guard s.ramAlertEnabled, value >= s.ramAlertThreshold else { return }
+        guard s.ramAlertEnabled else {
+            ramAlertSnoozed = false
+            return
+        }
+        if value < max(0, s.ramAlertThreshold - alertResetMargin) {
+            ramAlertSnoozed = false
+            return
+        }
+        guard value >= s.ramAlertThreshold, !ramAlertSnoozed else { return }
         if let last = lastRAMAlert, Date().timeIntervalSince(last) < alertCooldown { return }
         lastRAMAlert = Date()
+        ramAlertSnoozed = true
         Self.postAlert(
             title: "High Memory Usage",
             body: "RAM at \(Int(value))% (threshold \(Int(s.ramAlertThreshold))%)"

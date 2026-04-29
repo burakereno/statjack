@@ -80,6 +80,16 @@ struct SettingsView: View {
                     Divider().opacity(0.2).padding(.vertical, 2)
 
                     toggleRow(
+                        title: "Disk Usage",
+                        subtitle: "e.g. 71%",
+                        icon: AppIcons.disk,
+                        isOn: $settings.showDisk,
+                        disabled: settings.iconOnly
+                    )
+
+                    Divider().opacity(0.2).padding(.vertical, 2)
+
+                    toggleRow(
                         title: "Network Speed",
                         subtitle: "e.g. ↑1.2 ↓3.5",
                         icon: AppIcons.network,

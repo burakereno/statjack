@@ -60,6 +60,14 @@ final class AppSettings {
         }
     }
 
+    /// Show disk usage in menu bar
+    var showDisk: Bool {
+        didSet {
+            UserDefaults.standard.set(showDisk, forKey: "showDisk")
+            notifyChanged()
+        }
+    }
+
     /// Show network speed in menu bar
     var showNetwork: Bool {
         didSet {
@@ -191,6 +199,7 @@ final class AppSettings {
         self.iconOnly = defaults.object(forKey: "iconOnly") as? Bool ?? false
         self.showCPU = defaults.object(forKey: "showCPU") as? Bool ?? true
         self.showRAM = defaults.object(forKey: "showRAM") as? Bool ?? false
+        self.showDisk = defaults.object(forKey: "showDisk") as? Bool ?? false
         self.showNetwork = defaults.object(forKey: "showNetwork") as? Bool ?? false
         self.showGPU = defaults.object(forKey: "showGPU") as? Bool ?? false
         self.showTemperature = defaults.object(forKey: "showTemperature") as? Bool ?? false

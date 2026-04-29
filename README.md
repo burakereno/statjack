@@ -4,7 +4,7 @@
   <img src="statjack.png" alt="StatJack" width="340" height="340">
 </p>
 
-**Lightweight macOS menu bar system monitor.** Track CPU, RAM, and Network usage at a glance — right from your menu bar.
+**Lightweight macOS menu bar system monitor.** Track CPU, RAM, Disk, and Network usage at a glance — right from your menu bar.
 
 <p align="center">
   <a href="https://github.com/burakereno/statjack/releases/latest/download/StatJack.dmg">
@@ -24,12 +24,12 @@
 
 - 📊 **CPU** — total usage with user/system split
 - 🧠 **Memory** — used/total RAM with active / wired / compressed breakdown
+- 💾 **Disk** — used/available root volume space with low-frequency polling
 - 🌐 **Network** — live upload/download speeds + session totals
 - 🎮 **GPU** — utilization via IOAccelerator
 - 🌡️ **Temperature** — average + peak across all SoC sensors (Apple Silicon)
-- 📈 **Sparklines** — last 60 samples drawn under every metric
+- 📈 **Sparklines** — compact trend lines for live metrics
 - 🔔 **Threshold alerts** — macOS notifications when CPU or RAM cross your set %
-- 🌍 **Public IP** — fetched once at launch, click to copy
 - 🚀 **Launch at Login** — system Login Items via SMAppService
 - ⬇️ **One-click in-app updates** — checks GitHub releases, downloads + installs the new DMG without leaving the app
 - ⚡ **Minimal resource usage** — adaptive polling, hidden metrics skipped while idle
@@ -38,19 +38,13 @@
 ## Screenshots
 
 <p align="center">
-  <img src="docs/dashboard.png" alt="Dashboard with CPU, Memory and Network cards" width="320">
+  <img src="docs/dashboard.png" alt="Dashboard with CPU, Memory, Disk and Network cards" width="320">
   &nbsp;&nbsp;
-  <img src="docs/extras.png" alt="Dashboard with GPU and Temperature cards" width="320">
+  <img src="docs/settings.png" alt="Settings with menu bar toggles and Dock controls" width="320">
 </p>
 
 <p align="center">
-  <img src="docs/settings-dock.png" alt="Settings with Dock icon and badge metric controls" width="320">
-  &nbsp;&nbsp;
-  <img src="docs/alerts.png" alt="Settings with menu bar toggles, threshold alerts and About card" width="320">
-</p>
-
-<p align="center">
-  <sub>Live sparklines under every metric · GPU + temperature for Apple Silicon · Dock badge metric picker · threshold notifications.</sub>
+  <sub>Compact trend lines · GPU + temperature for Apple Silicon · Dock badge metric picker · threshold notifications.</sub>
 </p>
 
 ## Installation

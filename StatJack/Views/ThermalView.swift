@@ -12,6 +12,16 @@ struct ThermalView: View {
     var body: some View {
         if let reading = thermal.reading {
             MetricCardView(title: "Temperature", systemImage: "thermometer", showIcon: false) {
+                SparklineView(
+                    values: monitor.tempHistory,
+                    color: tempColor(reading.average),
+                    maxValue: tempMax,
+                    height: 18,
+                    showsFill: false
+                )
+                .frame(width: 110, height: 18)
+                .opacity(0.9)
+            } content: {
                 VStack(alignment: .leading, spacing: 6) {
                     HStack(alignment: .firstTextBaseline, spacing: 1) {
                         Text("\(Int(reading.average))")
@@ -29,12 +39,6 @@ struct ThermalView: View {
                         peak: reading.peak,
                         min: tempMin,
                         max: tempMax
-                    )
-
-                    SparklineView(
-                        values: monitor.tempHistory,
-                        color: tempColor(reading.average),
-                        maxValue: tempMax
                     )
 
                     HStack(spacing: 12) {

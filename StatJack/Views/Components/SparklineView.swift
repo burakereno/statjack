@@ -5,22 +5,25 @@ struct SparklineView: View {
     let color: Color
     var maxValue: Double? = nil
     var height: CGFloat = 22
+    var showsFill: Bool = true
 
     var body: some View {
         GeometryReader { geo in
             ZStack {
                 if values.count >= 2 {
                     let path = sparklinePath(in: geo.size)
-                    let fillPath = filledPath(from: path, height: geo.size.height)
 
-                    fillPath
-                        .fill(
-                            LinearGradient(
-                                colors: [color.opacity(0.25), color.opacity(0.0)],
-                                startPoint: .top,
-                                endPoint: .bottom
+                    if showsFill {
+                        let fillPath = filledPath(from: path, height: geo.size.height)
+                        fillPath
+                            .fill(
+                                LinearGradient(
+                                    colors: [color.opacity(0.25), color.opacity(0.0)],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                )
                             )
-                        )
+                    }
 
                     path
                         .stroke(color, style: StrokeStyle(lineWidth: 1.2, lineCap: .round, lineJoin: .round))

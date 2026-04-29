@@ -3,11 +3,12 @@ import SwiftUI
 /// Central icon definitions — descriptive SF Symbols for each concept
 enum AppIcons {
     // App
-    static let app = "chart.bar.fill"
+    static let app = "chart.line.uptrend.xyaxis"
 
     // Stats — descriptive hardware icons
     static let cpu = "cpu"
     static let ram = "memorychip"
+    static let disk = "internaldrive"
     static let network = "network"
     static let gpu = "display"
     static let temperature = "thermometer.medium"

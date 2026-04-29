@@ -8,6 +8,16 @@ struct CPUView: View {
 
     var body: some View {
         MetricCardView(title: "Processor", systemImage: AppIcons.cpu) {
+            SparklineView(
+                values: monitor.cpuHistory,
+                color: AppColors.usageColor(for: cpu.totalUsage),
+                maxValue: 100,
+                height: 18,
+                showsFill: false
+            )
+            .frame(width: 110, height: 18)
+            .opacity(0.9)
+        } content: {
             VStack(alignment: .leading, spacing: 6) {
                 HStack(alignment: .firstTextBaseline, spacing: 1) {
                     Text("\(Int(cpu.totalUsage))")
@@ -21,12 +31,6 @@ struct CPUView: View {
                 }
 
                 UsageBarView(percentage: cpu.totalUsage, height: 7)
-
-                SparklineView(
-                    values: monitor.cpuHistory,
-                    color: AppColors.usageColor(for: cpu.totalUsage),
-                    maxValue: 100
-                )
 
                 HStack(spacing: 12) {
                     legendItem(color: .blue, label: "USR", value: cpu.userUsage)

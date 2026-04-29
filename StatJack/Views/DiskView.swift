@@ -1,24 +1,13 @@
 import SwiftUI
 
-/// Memory usage view — overall stats and the active/wired/compressed split
-struct MemoryView: View {
+struct DiskView: View {
     let monitor: SystemMonitor
 
-    private var mem: MemoryMonitor { monitor.memoryMonitor }
-    private var usage: MemoryUsage { mem.memoryUsage }
+    private var disk: DiskMonitor { monitor.diskMonitor }
+    private var usage: DiskUsage { disk.diskUsage }
 
     var body: some View {
-        MetricCardView(title: "Memory", systemImage: AppIcons.ram) {
-            SparklineView(
-                values: monitor.ramHistory,
-                color: AppColors.usageColor(for: usage.usedPercentage),
-                maxValue: 100,
-                height: 18,
-                showsFill: false
-            )
-            .frame(width: 110, height: 18)
-            .opacity(0.9)
-        } content: {
+        MetricCardView(title: "Disk", systemImage: AppIcons.disk) {
             VStack(alignment: .leading, spacing: 6) {
                 HStack(alignment: .firstTextBaseline, spacing: 2) {
                     Text(Formatters.formatBytesCompact(usage.used))
@@ -33,16 +22,15 @@ struct MemoryView: View {
                 UsageBarView(percentage: usage.usedPercentage, height: 7)
 
                 HStack(spacing: 12) {
-                    memoryLegend("ACT", value: Formatters.formatBytesCompact(usage.active), color: .blue)
-                    memoryLegend("WIR", value: Formatters.formatBytesCompact(usage.wired), color: .orange)
-                    memoryLegend("COMP", value: Formatters.formatBytesCompact(usage.compressed), color: .purple)
+                    diskLegend("USED", value: Formatters.formatBytesCompact(usage.used), color: .orange)
+                    diskLegend("FREE", value: Formatters.formatBytesCompact(usage.available), color: .green)
                     Spacer()
                 }
             }
         }
     }
 
-    private func memoryLegend(_ label: String, value: String, color: Color) -> some View {
+    private func diskLegend(_ label: String, value: String, color: Color) -> some View {
         HStack(spacing: 4) {
             Circle()
                 .fill(color.opacity(0.8))

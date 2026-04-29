@@ -9,6 +9,22 @@ struct NetworkView: View {
 
     var body: some View {
         MetricCardView(title: "Network", systemImage: AppIcons.network) {
+            ZStack {
+                SparklineView(
+                    values: monitor.netDownloadHistory,
+                    color: .green,
+                    height: 18,
+                    showsFill: false
+                )
+                SparklineView(
+                    values: monitor.netUploadHistory,
+                    color: .blue.opacity(0.8),
+                    height: 18,
+                    showsFill: false
+                )
+            }
+            .frame(width: 110, height: 18)
+        } content: {
             VStack(spacing: 8) {
                 HStack(spacing: 12) {
                     speedRow(
@@ -24,18 +40,6 @@ struct NetworkView: View {
                         color: .green
                     )
                 }
-
-                ZStack {
-                    SparklineView(
-                        values: monitor.netDownloadHistory,
-                        color: .green
-                    )
-                    SparklineView(
-                        values: monitor.netUploadHistory,
-                        color: .blue
-                    )
-                }
-                .frame(height: 22)
 
                 Divider().opacity(0.2)
 

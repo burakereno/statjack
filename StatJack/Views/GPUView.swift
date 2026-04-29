@@ -8,6 +8,16 @@ struct GPUView: View {
     var body: some View {
         if let usage = gpu.utilization {
             MetricCardView(title: "GPU", systemImage: "cpu", showIcon: false) {
+                SparklineView(
+                    values: monitor.gpuHistory,
+                    color: AppColors.usageColor(for: usage),
+                    maxValue: 100,
+                    height: 18,
+                    showsFill: false
+                )
+                .frame(width: 110, height: 18)
+                .opacity(0.9)
+            } content: {
                 VStack(alignment: .leading, spacing: 6) {
                     HStack(alignment: .firstTextBaseline, spacing: 1) {
                         Text("\(Int(usage))")
@@ -21,12 +31,6 @@ struct GPUView: View {
                     }
 
                     UsageBarView(percentage: usage, height: 7)
-
-                    SparklineView(
-                        values: monitor.gpuHistory,
-                        color: AppColors.usageColor(for: usage),
-                        maxValue: 100
-                    )
                 }
             }
         }
