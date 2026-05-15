@@ -14,6 +14,10 @@
   <a href="https://github.com/burakereno/statjack/releases/latest">
     <img src="https://img.shields.io/github/v/release/burakereno/statjack?style=for-the-badge&label=Latest&color=2563eb&cb=2" alt="Latest release" height="48">
   </a>
+  &nbsp;
+  <a href="https://openai.com/codex">
+    <img src="https://img.shields.io/badge/Built%20with-Codex-2f80ed?style=for-the-badge&logo=openai&logoColor=white" alt="Built with Codex" height="48">
+  </a>
 </p>
 
 <p align="center">
