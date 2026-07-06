@@ -190,9 +190,6 @@ final class UpdateChecker {
         echo "[install] copying new app"
         /usr/bin/ditto "$SRC" "$TARGET"
 
-        echo "[install] stripping quarantine"
-        /usr/bin/xattr -cr "$TARGET"
-
         echo "[install] detaching dmg"
         /usr/bin/hdiutil detach "$MOUNT_POINT" -quiet -force 2>/dev/null
 

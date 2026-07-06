@@ -21,7 +21,7 @@
 </p>
 
 <p align="center">
-  <sub>macOS 14.0+ · ~3 MB · See <a href="#installation">Installation</a> for first-launch instructions</sub>
+  <sub>macOS 14.0+ · ~3 MB · Developer ID signed and notarized</sub>
 </p>
 
 ## Features
@@ -59,17 +59,7 @@
 2. Download **`StatJack.dmg`**
 3. Open the DMG and drag **StatJack.app** to your **Applications** folder
 
-### Important: First Launch (Unsigned App)
-
-Since StatJack is not notarized by Apple, macOS will block it on first launch. To fix this, run the following command in Terminal **once** after installing:
-
-```bash
-xattr -cr /Applications/StatJack.app
-```
-
-Then double-click StatJack to launch it. The app will appear in your menu bar (not in the Dock).
-
-> **Note:** This command removes the quarantine flag that macOS applies to downloaded apps. It's a standard procedure for open-source macOS apps that aren't distributed through the App Store.
+Double-click StatJack to launch it. The app is Developer ID signed and notarized, and will appear in your menu bar (not in the Dock).
 
 ## Build from Source
 
