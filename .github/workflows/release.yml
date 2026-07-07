@@ -177,11 +177,7 @@ jobs:
 
       - name: Create DMG
         run: |
-          mkdir -p dmg_source
-          cp -R build/Release/StatJack.app dmg_source/
-          ln -s /Applications dmg_source/Applications
-          hdiutil create -volname StatJack -srcfolder dmg_source -ov -format UDZO StatJack.dmg
-          rm -rf dmg_source
+          ./scripts/create-dmg.sh "build/Release/StatJack.app" StatJack.dmg
           codesign --force --sign "${{ steps.signing.outputs.identity }}" --timestamp StatJack.dmg
 
       - name: Notarize DMG
