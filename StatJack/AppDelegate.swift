@@ -25,20 +25,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     private var isSettingsVisible = false
     private var lastDockBadgeLabel: String?
     private var isDockBadgeVisible = false
-    private var statusSymbolCache: [String: NSImage] = [:]
-    private var statusImage: NSImage?
     private var dockBadgeView: DockBadgeView?
     private var preferredPopoverHeight = StatJackPopoverLayout.initialHeight
+    private let statusImageRenderer = MenuBarStatusImageRenderer()
 
     private let activeInterval: TimeInterval = 2.0
-    private let statusSymbolConfig = NSImage.SymbolConfiguration(
-        pointSize: MenuBarDisplay.metricIconPointSize,
-        weight: .medium
-    )
-    private let statusFont = NSFont.monospacedSystemFont(
-        ofSize: MenuBarDisplay.metricTextPointSize,
-        weight: .medium
-    )
 
     private struct MenuBarState: Equatable {
         let iconOnly: Bool
@@ -315,7 +306,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             button.imagePosition = .imageOnly
             button.title = ""
         } else {
-            let image = renderStatusImage(segments: segments)
+            let image = statusImageRenderer.image(for: segments)
             statusItem.length = image.size.width
             button.image = image
             button.needsDisplay = true
@@ -324,71 +315,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         }
     }
 
-    /// Draws the same fixed-width icon + value segments used by the settings
-    /// preview, preventing the status item from resizing on every network tick.
-    private func renderStatusImage(segments: [MenuBarMetricSegment]) -> NSImage {
-        let w = MenuBarDisplay.contentWidth(for: segments)
-        let h = MenuBarDisplay.statusHeight
-        let attrs: [NSAttributedString.Key: Any] = [
-            .font: statusFont,
-            .foregroundColor: NSColor.black
-        ]
-
-        let size = NSSize(width: w, height: h)
-        let image: NSImage
-        if let statusImage, statusImage.size == size {
-            image = statusImage
-        } else {
-            image = NSImage(size: size)
-            statusImage = image
-        }
-
-        image.lockFocus()
-        NSColor.clear.setFill()
-        NSRect(x: 0, y: 0, width: w, height: h).fill()
-
-        var x = MenuBarDisplay.horizontalPadding
-        for segment in segments {
-            drawSymbol(segment.symbolName, x: x, canvasHeight: h)
-
-            let textX = x + MenuBarDisplay.metricIconWidth + MenuBarDisplay.iconTextSpacing
-            let textSize = (segment.text as NSString).size(withAttributes: attrs)
-            let textY = floor((h - textSize.height) / 2)
-            (segment.text as NSString).draw(
-                at: NSPoint(x: textX, y: textY),
-                withAttributes: attrs
-            )
-            x += segment.width + MenuBarDisplay.segmentSpacing
-        }
-
-        image.unlockFocus()
-        image.isTemplate = true
-        return image
-    }
-
-    private func drawSymbol(_ symbolName: String, x: CGFloat, canvasHeight: CGFloat) {
-        let symbol: NSImage
-        if let cached = statusSymbolCache[symbolName] {
-            symbol = cached
-        } else if let image = NSImage(
-            systemSymbolName: symbolName,
-            accessibilityDescription: nil
-        )?.withSymbolConfiguration(statusSymbolConfig) {
-            statusSymbolCache[symbolName] = image
-            symbol = image
-        } else {
-            return
-        }
-
-        let symbolSize = symbol.size
-        let rect = NSRect(
-            x: x + (MenuBarDisplay.metricIconWidth - symbolSize.width) / 2,
-            y: (canvasHeight - symbolSize.height) / 2,
-            width: symbolSize.width,
-            height: symbolSize.height
-        )
-        symbol.draw(in: rect)
-    }
 }
 
 private final class DockBadgeView: NSView {
