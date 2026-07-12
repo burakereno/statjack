@@ -2,10 +2,11 @@ import Foundation
 import Observation
 
 @Observable
+@MainActor
 final class DiskMonitor {
     private(set) var diskUsage = DiskUsage(total: 0, available: 0)
 
-    static func sample() -> DiskUsage? {
+    nonisolated static func sample() -> DiskUsage? {
         do {
             let url = URL(fileURLWithPath: "/")
             let values = try url.resourceValues(forKeys: [

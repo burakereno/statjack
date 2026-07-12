@@ -10,7 +10,7 @@ extension Notification.Name {
     static let statJackSettingsChanged = Notification.Name("StatJackSettingsChanged")
 }
 
-enum DockBadgeMetric: String, CaseIterable, Identifiable {
+enum DockBadgeMetric: String, CaseIterable, Identifiable, Sendable {
     case cpu
     case ram
     case temperature
@@ -22,13 +22,13 @@ enum DockBadgeMetric: String, CaseIterable, Identifiable {
         switch self {
         case .cpu: "CPU"
         case .ram: "RAM"
-        case .temperature: "Temp"
+        case .temperature: "Thermal"
         case .gpu: "GPU"
         }
     }
 }
 
-enum MenuBarRefreshInterval: Double, CaseIterable, Identifiable {
+enum MenuBarRefreshInterval: Double, CaseIterable, Identifiable, Sendable {
     case five = 5
     case ten = 10
     case fifteen = 15
@@ -42,6 +42,7 @@ enum MenuBarRefreshInterval: Double, CaseIterable, Identifiable {
 
 /// Persistent app settings with native toggle support
 @Observable
+@MainActor
 final class AppSettings {
     static let shared = AppSettings()
 
@@ -96,7 +97,7 @@ final class AppSettings {
         }
     }
 
-    /// Show CPU/SoC temperature in menu bar
+    /// Show system thermal state in menu bar. UserDefaults key remains stable.
     var showTemperature: Bool {
         didSet {
             UserDefaults.standard.set(showTemperature, forKey: "showTemperature")

@@ -1,13 +1,43 @@
 import Foundation
 
 /// System-wide memory breakdown
-struct MemoryUsage {
+struct MemoryUsage: Equatable, Sendable {
     let total: UInt64       // Total physical memory
-    let used: UInt64        // Used memory (active + wired + compressed)
-    let active: UInt64
+    let used: UInt64        // App-like anonymous + wired + compressed memory
+    let app: UInt64
     let wired: UInt64
     let compressed: UInt64
     let free: UInt64
+
+    static func calculated(
+        total: UInt64,
+        pageSize: UInt64,
+        internalPages: UInt64,
+        purgeablePages: UInt64,
+        wiredPages: UInt64,
+        compressedPages: UInt64,
+        freePages: UInt64
+    ) -> MemoryUsage {
+        let appPages = internalPages >= purgeablePages
+            ? internalPages - purgeablePages
+            : 0
+        let app = appPages * pageSize
+        let wired = wiredPages * pageSize
+        let compressed = compressedPages * pageSize
+        let componentTotal = app.addingReportingOverflow(wired)
+        let appAndWired = componentTotal.overflow ? UInt64.max : componentTotal.partialValue
+        let usedTotal = appAndWired.addingReportingOverflow(compressed)
+        let used = min(total, usedTotal.overflow ? UInt64.max : usedTotal.partialValue)
+
+        return MemoryUsage(
+            total: total,
+            used: used,
+            app: app,
+            wired: wired,
+            compressed: compressed,
+            free: min(total, freePages * pageSize)
+        )
+    }
 
     var usedPercentage: Double {
         guard total > 0 else { return 0 }
@@ -16,7 +46,7 @@ struct MemoryUsage {
 }
 
 /// Root filesystem usage
-struct DiskUsage {
+struct DiskUsage: Equatable, Sendable {
     let total: UInt64
     let available: UInt64
 
@@ -31,7 +61,7 @@ struct DiskUsage {
 }
 
 /// System-wide network throughput
-struct NetworkUsage {
+struct NetworkUsage: Equatable, Sendable {
     let uploadSpeed: Double    // bytes per second
     let downloadSpeed: Double  // bytes per second
     let totalUploaded: UInt64  // cumulative bytes
@@ -47,7 +77,7 @@ struct NetworkUsage {
 }
 
 /// Raw CPU counters sampled off the main thread, then applied on main.
-struct CPUSample {
+struct CPUSample: Equatable, Sendable {
     let user: UInt64
     let system: UInt64
     let idle: UInt64
@@ -55,14 +85,14 @@ struct CPUSample {
 }
 
 /// Raw network counters sampled off the main thread, then applied on main.
-struct NetworkSample {
+struct NetworkSample: Equatable, Sendable {
     let bytesIn: UInt64
     let bytesOut: UInt64
     let timestamp: TimeInterval
 }
 
 /// Optional samples collected during one monitoring tick.
-struct SystemSample {
+struct SystemSample: Sendable {
     let cpu: CPUSample?
     let memory: MemoryUsage?
     let disk: DiskUsage?
@@ -70,6 +100,6 @@ struct SystemSample {
     let network: NetworkSample?
     let gpuUtilization: Double?
     let gpuSampled: Bool
-    let thermal: ThermalReading?
+    let thermal: ThermalCondition?
     let thermalSampled: Bool
 }

@@ -4,49 +4,33 @@ struct ThermalView: View {
     let monitor: SystemMonitor
 
     private var thermal: ThermalMonitor { monitor.thermalMonitor }
-
-    /// Visual temperature scale runs 30°C → 100°C.
-    private let tempMin: Double = 30
-    private let tempMax: Double = 100
+    private var condition: ThermalCondition { thermal.condition }
 
     var body: some View {
-        if let reading = thermal.reading {
-            MetricCardView(title: "Temperature", systemImage: "thermometer", showIcon: false) {
-                SparklineView(
-                    values: monitor.tempHistory,
-                    color: tempColor(reading.average),
-                    maxValue: tempMax,
-                    height: 18,
-                    showsFill: false
-                )
-                .frame(width: 110, height: 18)
-                .opacity(0.9)
-            } content: {
-                VStack(alignment: .leading, spacing: 6) {
-                    HStack(alignment: .firstTextBaseline, spacing: 1) {
-                        Text("\(Int(reading.average))")
-                            .font(.system(size: 22, weight: .bold, design: .monospaced))
-                            .foregroundStyle(tempColor(reading.average))
-                            .contentTransition(.numericText())
-                            .animation(.easeInOut(duration: 0.3), value: Int(reading.average))
-                        Text("°C")
-                            .font(.system(size: 11, weight: .semibold, design: .monospaced))
-                            .foregroundStyle(.secondary)
-                    }
+        MetricCardView(title: "Thermal State", systemImage: "thermometer", showIcon: false) {
+            SparklineView(
+                values: monitor.thermalHistory,
+                color: conditionColor,
+                maxValue: 100,
+                height: 18,
+                showsFill: false
+            )
+            .frame(width: 110, height: 18)
+            .opacity(0.9)
+        } content: {
+            VStack(alignment: .leading, spacing: 6) {
+                Text(condition.title)
+                    .font(.system(size: 18, weight: .bold, design: .monospaced))
+                    .foregroundStyle(conditionColor)
+                    .contentTransition(.numericText())
+                    .animation(.easeInOut(duration: 0.3), value: condition)
 
-                    TemperatureBar(
-                        average: reading.average,
-                        peak: reading.peak,
-                        min: tempMin,
-                        max: tempMax
-                    )
+                UsageBarView(percentage: condition.level, height: 7)
 
-                    HStack(spacing: 12) {
-                        thermalLegend(label: "AVG", value: "\(Int(reading.average))°", color: tempColor(reading.average))
-                        thermalLegend(label: "PEAK", value: "\(Int(reading.peak))°", color: tempColor(reading.peak))
-                        thermalLegend(label: "SENSORS", value: "\(reading.count)", color: .gray)
-                        Spacer()
-                    }
+                HStack(spacing: 12) {
+                    thermalLegend(label: "STATE", value: condition.compactLabel, color: conditionColor)
+                    thermalLegend(label: "IMPACT", value: condition.impact, color: conditionColor)
+                    Spacer()
                 }
             }
         }
@@ -67,63 +51,12 @@ struct ThermalView: View {
         }
     }
 
-    private func tempColor(_ celsius: Double) -> Color {
-        switch celsius {
-        case ..<60:   return .green
-        case 60..<75: return .yellow
-        case 75..<90: return .orange
-        default:      return .red
+    private var conditionColor: Color {
+        switch condition {
+        case .nominal: .green
+        case .fair: .yellow
+        case .serious: .orange
+        case .critical: .red
         }
-    }
-}
-
-private struct TemperatureBar: View {
-    let average: Double
-    let peak: Double
-    let min: Double
-    let max: Double
-
-    var body: some View {
-        GeometryReader { geo in
-            let avgRatio = ratio(average, in: geo.size.width)
-            let peakRatio = ratio(peak, in: geo.size.width)
-
-            ZStack(alignment: .leading) {
-                Capsule()
-                    .fill(
-                        LinearGradient(
-                            colors: [.green, .yellow, .orange, .red],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        )
-                    )
-                    .frame(height: 7)
-                    .opacity(0.25)
-
-                Capsule()
-                    .fill(
-                        LinearGradient(
-                            colors: [.green, .yellow, .orange, .red],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        )
-                    )
-                    .frame(width: avgRatio, height: 7)
-
-                if peak > average {
-                    Rectangle()
-                        .fill(Color.white.opacity(0.85))
-                        .frame(width: 2, height: 11)
-                        .offset(x: peakRatio - 1)
-                }
-            }
-        }
-        .frame(height: 11)
-    }
-
-    private func ratio(_ value: Double, in width: CGFloat) -> CGFloat {
-        let clamped = Swift.min(Swift.max(value, min), max)
-        let normalized = (clamped - min) / (max - min)
-        return CGFloat(normalized) * width
     }
 }

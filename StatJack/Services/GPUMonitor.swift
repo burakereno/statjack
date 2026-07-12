@@ -3,6 +3,7 @@ import IOKit
 import Observation
 
 @Observable
+@MainActor
 final class GPUMonitor {
     /// Latest device utilization 0–100. `nil` until first sample lands.
     var utilization: Double?
@@ -13,7 +14,7 @@ final class GPUMonitor {
 
     /// Reads "Device Utilization %" off the IOAccelerator service. Cheap
     /// — single registry query, no IOServiceOpen, no continuous handle.
-    static func sample() -> Double? {
+    nonisolated static func sample() -> Double? {
         let matching = IOServiceMatching("IOAccelerator")
         var iterator: io_iterator_t = 0
         guard IOServiceGetMatchingServices(kIOMainPortDefault, matching, &iterator) == KERN_SUCCESS else {

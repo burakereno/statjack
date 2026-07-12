@@ -110,8 +110,8 @@ struct SettingsView: View {
                     Divider().opacity(0.2).padding(.vertical, 2)
 
                     toggleRow(
-                        title: "Temperature",
-                        subtitle: "e.g. 52°C",
+                        title: "Thermal State",
+                        subtitle: "e.g. OK or HIGH",
                         icon: AppIcons.temperature,
                         isOn: $settings.showTemperature,
                         disabled: settings.iconOnly
@@ -289,7 +289,7 @@ struct SettingsView: View {
                 Text("Badge Metric")
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(disabled ? .tertiary : .primary)
-                Text("CPU, RAM, Temp, or GPU")
+                Text("CPU, RAM, Thermal, or GPU")
                     .font(.system(size: 10))
                     .foregroundStyle(.tertiary)
             }

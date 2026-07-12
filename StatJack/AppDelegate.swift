@@ -1,6 +1,18 @@
 import AppKit
 import SwiftUI
 
+enum StatJackPopoverLayout {
+    static let width: CGFloat = 320
+    static let initialHeight: CGFloat = 860
+    static let minimumHeight: CGFloat = 240
+    static let screenEdgeMargin: CGFloat = 24
+
+    static func clampedHeight(_ preferredHeight: CGFloat, visibleScreenHeight: CGFloat) -> CGFloat {
+        let maximumHeight = max(minimumHeight, visibleScreenHeight - screenEdgeMargin)
+        return min(max(preferredHeight, minimumHeight), maximumHeight)
+    }
+}
+
 /// AppDelegate managing NSStatusItem + NSPopover for full menu bar control
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
@@ -14,6 +26,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     private var lastDockBadgeLabel: String?
     private var isDockBadgeVisible = false
     private var statusSymbolCache: [String: NSImage] = [:]
+    private var statusImage: NSImage?
+    private var dockBadgeView: DockBadgeView?
+    private var preferredPopoverHeight = StatJackPopoverLayout.initialHeight
 
     private let activeInterval: TimeInterval = 2.0
     private let statusSymbolConfig = NSImage.SymbolConfiguration(
@@ -46,15 +61,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         popover.behavior = .transient
         popover.delegate = self
         popover.appearance = NSAppearance(named: .darkAqua)
-        popover.contentSize = NSSize(width: 320, height: 572)
+        popover.contentSize = NSSize(
+            width: StatJackPopoverLayout.width,
+            height: StatJackPopoverLayout.initialHeight
+        )
         popover.contentViewController = NSHostingController(
             rootView: ContentView(
                 monitor: monitor,
                 onSettingsVisibilityChanged: { [weak self] visible in
                     self?.settingsVisibilityChanged(visible)
+                },
+                onPreferredHeightChange: { [weak self] height in
+                    self?.updatePopoverHeight(height)
                 }
             )
-                .frame(width: 320, height: 572)
+                .frame(width: StatJackPopoverLayout.width)
         )
 
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -102,6 +123,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             closePopover()
         } else {
             NSApp.activate(ignoringOtherApps: true)
+            applyPreferredPopoverHeight(for: button.window?.screen)
             popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
             updateMonitoringMode()
             monitor.refreshNow()
@@ -109,6 +131,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             startEventMonitor()
             Task { await UpdateChecker.shared.checkForUpdates() }
         }
+    }
+
+    private func updatePopoverHeight(_ preferredHeight: CGFloat) {
+        preferredPopoverHeight = preferredHeight
+        applyPreferredPopoverHeight(for: statusItem.button?.window?.screen)
+    }
+
+    private func applyPreferredPopoverHeight(for screen: NSScreen?) {
+        let visibleScreenHeight = screen?.visibleFrame.height
+            ?? NSScreen.main?.visibleFrame.height
+            ?? preferredPopoverHeight
+        let height = StatJackPopoverLayout.clampedHeight(
+            preferredPopoverHeight,
+            visibleScreenHeight: visibleScreenHeight
+        )
+
+        guard abs(popover.contentSize.height - height) > 0.5 else { return }
+        popover.contentSize = NSSize(width: StatJackPopoverLayout.width, height: height)
     }
 
     private func focusPopoverWindow() {
@@ -190,8 +230,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         lastDockBadgeLabel = label
         isDockBadgeVisible = true
 
+        let badgeView: DockBadgeView
+        if let dockBadgeView {
+            badgeView = dockBadgeView
+            badgeView.label = label
+        } else {
+            badgeView = DockBadgeView(label: label)
+            dockBadgeView = badgeView
+        }
+
         NSApp.dockTile.badgeLabel = nil
-        NSApp.dockTile.contentView = DockBadgeView(label: label)
+        if NSApp.dockTile.contentView !== badgeView {
+            NSApp.dockTile.contentView = badgeView
+        }
+        badgeView.needsDisplay = true
         NSApp.dockTile.display()
     }
 
@@ -266,6 +318,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             let image = renderStatusImage(segments: segments)
             statusItem.length = image.size.width
             button.image = image
+            button.needsDisplay = true
             button.imagePosition = .imageOnly
             button.title = ""
         }
@@ -281,7 +334,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             .foregroundColor: NSColor.black
         ]
 
-        let image = NSImage(size: NSSize(width: w, height: h))
+        let size = NSSize(width: w, height: h)
+        let image: NSImage
+        if let statusImage, statusImage.size == size {
+            image = statusImage
+        } else {
+            image = NSImage(size: size)
+            statusImage = image
+        }
+
         image.lockFocus()
         NSColor.clear.setFill()
         NSRect(x: 0, y: 0, width: w, height: h).fill()
@@ -331,7 +392,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
 }
 
 private final class DockBadgeView: NSView {
-    private let label: String
+    var label: String
 
     init(label: String) {
         self.label = label

@@ -4,6 +4,7 @@ import Observation
 
 /// Monitors system-wide network throughput using getifaddrs (public API)
 @Observable
+@MainActor
 final class NetworkMonitor {
     /// Current network usage
     private(set) var networkUsage = NetworkUsage(
@@ -21,7 +22,7 @@ final class NetworkMonitor {
 
     // MARK: - Update
 
-    static func sample() -> NetworkSample {
+    nonisolated static func sample() -> NetworkSample {
         let (totalIn, totalOut) = getInterfaceBytes()
         return NetworkSample(
             bytesIn: totalIn,
@@ -56,7 +57,7 @@ final class NetworkMonitor {
     // MARK: - getifaddrs
 
     /// Returns total (bytesIn, bytesOut) across all non-loopback interfaces
-    private static func getInterfaceBytes() -> (UInt64, UInt64) {
+    nonisolated private static func getInterfaceBytes() -> (UInt64, UInt64) {
         var totalIn: UInt64 = 0
         var totalOut: UInt64 = 0
 

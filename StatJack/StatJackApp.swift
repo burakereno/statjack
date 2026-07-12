@@ -9,5 +9,6 @@ struct StatJackApp: App {
         Settings {
             EmptyView()
         }
+        .commandsRemoved()
     }
 }

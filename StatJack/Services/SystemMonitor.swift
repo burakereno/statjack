@@ -6,7 +6,17 @@ import UserNotifications
 /// (CPU, memory, network). The polling cadence is driven externally by the
 /// AppDelegate so it can slow down when the popover is closed.
 @Observable
+@MainActor
 final class SystemMonitor {
+    private struct MetricSelection: Sendable {
+        let cpu: Bool
+        let memory: Bool
+        let disk: Bool
+        let network: Bool
+        let gpu: Bool
+        let thermal: Bool
+    }
+
     let cpuMonitor = CPUMonitor()
     let memoryMonitor = MemoryMonitor()
     let diskMonitor = DiskMonitor()
@@ -23,7 +33,7 @@ final class SystemMonitor {
     var menuBarDisk: String = "0%"
     var menuBarNet: String = "↑0K ↓0K"
     var menuBarGPU: String = "--"
-    var menuBarTemp: String = "--"
+    var menuBarTemp: String = "OK"
 
     /// Rolling history of recent samples for sparkline rendering.
     /// Capped at `historyCapacity` entries; appended on every tick.
@@ -33,7 +43,7 @@ final class SystemMonitor {
     var netUploadHistory: [Double] = []
     var netDownloadHistory: [Double] = []
     var gpuHistory: [Double] = []
-    var tempHistory: [Double] = []
+    var thermalHistory: [Double] = []
 
     @ObservationIgnored
     static let historyCapacity = 60
@@ -70,7 +80,7 @@ final class SystemMonitor {
     @ObservationIgnored
     private let diskSampleInterval: TimeInterval = 300
     @ObservationIgnored
-    private let sampleQueue = DispatchQueue(label: "com.statjack.monitor.samples", qos: .utility)
+    private var samplingTask: Task<Void, Never>?
     @ObservationIgnored
     private let bootDate: Date?
 
@@ -78,10 +88,6 @@ final class SystemMonitor {
         bootDate = Self.loadBootDate()
         tick()
         startMonitoring(interval: AppSettings.shared.menuBarRefreshInterval.rawValue)
-    }
-
-    deinit {
-        timer?.invalidate()
     }
 
     /// Starts (or reschedules) the repeating update timer at the given
@@ -96,7 +102,9 @@ final class SystemMonitor {
 
         timer?.invalidate()
         let timer = Timer(timeInterval: interval, repeats: true) { [weak self] _ in
-            self?.tick()
+            Task { @MainActor [weak self] in
+                self?.tick()
+            }
         }
         RunLoop.main.add(timer, forMode: .common)
         self.timer = timer
@@ -107,6 +115,9 @@ final class SystemMonitor {
         timer = nil
         currentInterval = 0
         pendingRefresh = false
+        isUpdating = false
+        samplingTask?.cancel()
+        samplingTask = nil
     }
 
     func refreshNow() {
@@ -123,7 +134,7 @@ final class SystemMonitor {
         isUpdating = true
 
         let selection = metricSelection()
-        let sampleThermal = selection.temperature && shouldSampleThermal()
+        let sampleThermal = selection.thermal && shouldSampleThermal()
         let sampleDisk = selection.disk && shouldSampleDisk()
         guard selection.cpu || selection.memory || sampleDisk || selection.network || selection.gpu || sampleThermal else {
             updateUptime()
@@ -132,27 +143,38 @@ final class SystemMonitor {
             return
         }
 
-        sampleQueue.async { [weak self] in
-            let sample = SystemSample(
-                cpu: selection.cpu ? CPUMonitor.sample() : nil,
-                memory: selection.memory ? MemoryMonitor.sample() : nil,
-                disk: sampleDisk ? DiskMonitor.sample() : nil,
-                diskSampled: sampleDisk,
-                network: selection.network ? NetworkMonitor.sample() : nil,
-                gpuUtilization: selection.gpu ? GPUMonitor.sample() : nil,
-                gpuSampled: selection.gpu,
-                thermal: sampleThermal ? ThermalMonitor.sample() : nil,
-                thermalSampled: sampleThermal
+        samplingTask = Task { [weak self] in
+            let sample = await Self.collectSample(
+                selection: selection,
+                sampleDisk: sampleDisk,
+                sampleThermal: sampleThermal
             )
+            guard !Task.isCancelled, let self else { return }
 
-            DispatchQueue.main.async { [weak self] in
-                guard let self else { return }
-                self.apply(sample)
-                self.isUpdating = false
-                NotificationCenter.default.post(name: .statJackValuesChanged, object: self)
-                self.runPendingRefreshIfNeeded()
-            }
+            self.samplingTask = nil
+            self.apply(sample)
+            self.isUpdating = false
+            NotificationCenter.default.post(name: .statJackValuesChanged, object: self)
+            self.runPendingRefreshIfNeeded()
         }
+    }
+
+    nonisolated private static func collectSample(
+        selection: MetricSelection,
+        sampleDisk: Bool,
+        sampleThermal: Bool
+    ) async -> SystemSample {
+        SystemSample(
+            cpu: selection.cpu ? CPUMonitor.sample() : nil,
+            memory: selection.memory ? MemoryMonitor.sample() : nil,
+            disk: sampleDisk ? DiskMonitor.sample() : nil,
+            diskSampled: sampleDisk,
+            network: selection.network ? NetworkMonitor.sample() : nil,
+            gpuUtilization: selection.gpu ? GPUMonitor.sample() : nil,
+            gpuSampled: selection.gpu,
+            thermal: sampleThermal ? ThermalMonitor.sample() : nil,
+            thermalSampled: sampleThermal
+        )
     }
 
     private func runPendingRefreshIfNeeded() {
@@ -183,8 +205,10 @@ final class SystemMonitor {
         return true
     }
 
-    private func metricSelection() -> (cpu: Bool, memory: Bool, disk: Bool, network: Bool, gpu: Bool, temperature: Bool) {
-        guard !collectAllMetrics else { return (true, true, true, true, true, true) }
+    private func metricSelection() -> MetricSelection {
+        guard !collectAllMetrics else {
+            return MetricSelection(cpu: true, memory: true, disk: true, network: true, gpu: true, thermal: true)
+        }
 
         let settings = AppSettings.shared
         let dockMetric = settings.showDockIcon && settings.showDockBadge ? settings.dockBadgeMetric : nil
@@ -198,7 +222,14 @@ final class SystemMonitor {
         let needsNetwork = !settings.iconOnly && settings.showNetwork
         let needsGPU = (!settings.iconOnly && settings.showGPU) || needsDockGPU
         let needsTemperature = (!settings.iconOnly && settings.showTemperature) || needsDockTemperature
-        return (needsCPU, needsMemory, needsDisk, needsNetwork, needsGPU, needsTemperature)
+        return MetricSelection(
+            cpu: needsCPU,
+            memory: needsMemory,
+            disk: needsDisk,
+            network: needsNetwork,
+            gpu: needsGPU,
+            thermal: needsTemperature
+        )
     }
 
     private func apply(_ sample: SystemSample) {
@@ -242,12 +273,10 @@ final class SystemMonitor {
         }
 
         if sample.thermalSampled {
-            thermalMonitor.apply(sample.thermal)
-            if let t = sample.thermal {
-                appendHistory(&tempHistory, value: t.average)
-                menuBarTemp = "\(Int(t.average))°"
-            } else {
-                menuBarTemp = "--"
+            if let condition = sample.thermal {
+                thermalMonitor.apply(condition)
+                appendHistory(&thermalHistory, value: condition.level)
+                menuBarTemp = condition.compactLabel
             }
         }
 

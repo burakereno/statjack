@@ -8,9 +8,10 @@ struct MenuBarMetricSegment: Equatable, Identifiable {
     let width: CGFloat
 }
 
+@MainActor
 enum MenuBarDisplay {
     static let statusHeight: CGFloat = 22
-    static let horizontalPadding: CGFloat = 4
+    static let horizontalPadding: CGFloat = 2
     static let iconOnlyWidth: CGFloat = 22
     static let metricIconWidth: CGFloat = 14
     static let iconTextSpacing: CGFloat = 2

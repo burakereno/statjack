@@ -7,6 +7,7 @@ import Observation
 /// every PID were the dominant source of CPU overhead in this app, and
 /// Activity Monitor already covers the per-process use case.
 @Observable
+@MainActor
 final class CPUMonitor {
     /// Overall CPU usage percentage (0-100)
     private(set) var totalUsage: Double = 0
@@ -21,7 +22,7 @@ final class CPUMonitor {
     @ObservationIgnored
     private var previousCPUTicks: (user: UInt64, system: UInt64, idle: UInt64, nice: UInt64)?
 
-    static func sample() -> CPUSample? {
+    nonisolated static func sample() -> CPUSample? {
         var numCPUs: natural_t = 0
         var cpuInfo: processor_info_array_t?
         var numCPUInfo: mach_msg_type_number_t = 0

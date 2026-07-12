@@ -33,7 +33,7 @@ struct MemoryView: View {
                 UsageBarView(percentage: usage.usedPercentage, height: 7)
 
                 HStack(spacing: 12) {
-                    memoryLegend("ACT", value: Formatters.formatBytesCompact(usage.active), color: .blue)
+                    memoryLegend("APP", value: Formatters.formatBytesCompact(usage.app), color: .blue)
                     memoryLegend("WIR", value: Formatters.formatBytesCompact(usage.wired), color: .orange)
                     memoryLegend("COMP", value: Formatters.formatBytesCompact(usage.compressed), color: .purple)
                     Spacer()

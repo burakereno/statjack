@@ -31,7 +31,7 @@
 - 💾 **Disk** — used/available root volume space with low-frequency polling
 - 🌐 **Network** — live upload/download speeds + session totals
 - 🎮 **GPU** — utilization via IOAccelerator
-- 🌡️ **Temperature** — average + peak across all SoC sensors (Apple Silicon)
+- 🌡️ **Thermal state** — public macOS thermal pressure status (normal, elevated, high, critical)
 - 📈 **Sparklines** — compact trend lines for live metrics
 - 🔔 **Threshold alerts** — macOS notifications when CPU or RAM cross your set %
 - 🚀 **Launch at Login** — system Login Items via SMAppService
@@ -48,7 +48,7 @@
 </p>
 
 <p align="center">
-  <sub>Compact trend lines · GPU + temperature for Apple Silicon · Dock badge metric picker · threshold notifications.</sub>
+  <sub>Compact trend lines · GPU + thermal state · Dock badge metric picker · threshold notifications.</sub>
 </p>
 
 ## Installation

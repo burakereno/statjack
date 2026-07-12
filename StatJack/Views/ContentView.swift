@@ -4,8 +4,14 @@ import SwiftUI
 struct ContentView: View {
     let monitor: SystemMonitor
     let onSettingsVisibilityChanged: (Bool) -> Void
+    let onPreferredHeightChange: (CGFloat) -> Void
     @State private var showSettings = false
     @State private var showFooterUpToDate = false
+    @State private var headerHeight: CGFloat = 0
+    @State private var dashboardContentHeight: CGFloat = 0
+    @State private var settingsContentHeight: CGFloat = 0
+    @State private var footerHeight: CGFloat = 0
+    @State private var lastReportedHeight: CGFloat = 0
     @Bindable private var updater = UpdateChecker.shared
 
     private var appVersion: String {
@@ -16,6 +22,12 @@ struct ContentView: View {
         VStack(spacing: 0) {
             // Header
             headerView
+                .onGeometryChange(for: CGFloat.self) { proxy in
+                    proxy.size.height
+                } action: { height in
+                    headerHeight = height
+                    reportPreferredHeight()
+                }
 
             Divider().opacity(0.5)
 
@@ -26,6 +38,12 @@ struct ContentView: View {
                             .padding(.horizontal, 12)
                             .padding(.top, 10)
                             .padding(.bottom, 12)
+                            .onGeometryChange(for: CGFloat.self) { proxy in
+                                proxy.size.height
+                            } action: { height in
+                                settingsContentHeight = height
+                                reportPreferredHeight()
+                            }
                     }
                     .transition(.asymmetric(
                         insertion: .move(edge: .trailing).combined(with: .opacity),
@@ -46,6 +64,12 @@ struct ContentView: View {
                         .padding(.horizontal, 12)
                         .padding(.top, 10)
                         .padding(.bottom, 12)
+                        .onGeometryChange(for: CGFloat.self) { proxy in
+                            proxy.size.height
+                        } action: { height in
+                            dashboardContentHeight = height
+                            reportPreferredHeight()
+                        }
                     }
                     .transition(.asymmetric(
                         insertion: .move(edge: .leading).combined(with: .opacity),
@@ -58,13 +82,32 @@ struct ContentView: View {
             .animation(.snappy(duration: 0.24), value: showSettings)
             .onChange(of: showSettings) { _, newValue in
                 onSettingsVisibilityChanged(newValue)
+                reportPreferredHeight()
             }
 
             Divider().opacity(0.5)
 
             // Footer
             footerView
+                .onGeometryChange(for: CGFloat.self) { proxy in
+                    proxy.size.height
+                } action: { height in
+                    footerHeight = height
+                    reportPreferredHeight()
+                }
         }
+    }
+
+    private func reportPreferredHeight() {
+        let contentHeight = showSettings ? settingsContentHeight : dashboardContentHeight
+        guard headerHeight > 0, contentHeight > 0, footerHeight > 0 else { return }
+
+        let dividerHeights: CGFloat = 2
+        let preferredHeight = ceil(headerHeight + contentHeight + footerHeight + dividerHeights)
+        guard abs(lastReportedHeight - preferredHeight) > 0.5 else { return }
+
+        lastReportedHeight = preferredHeight
+        onPreferredHeightChange(preferredHeight)
     }
 
     // MARK: - Header
@@ -242,7 +285,7 @@ private struct SummaryRibbonView: View {
         let diskUsage = monitor.diskMonitor.diskUsage.usedPercentage
         let networkUsage = monitor.networkMonitor.networkUsage
         let gpuUsage = monitor.gpuMonitor.utilization
-        let thermalReading = monitor.thermalMonitor.reading
+        let thermalCondition = monitor.thermalMonitor.condition
 
         return [
             SummaryMetric(
@@ -282,20 +325,20 @@ private struct SummaryRibbonView: View {
             ),
             SummaryMetric(
                 id: "temp",
-                label: "TEMP",
-                value: thermalReading.map { "\(Int($0.average))°" } ?? "--",
+                label: "THERM",
+                value: thermalCondition.compactLabel,
                 systemImage: AppIcons.temperature,
-                color: thermalReading.map { tempColor($0.average) } ?? .secondary
+                color: thermalColor(thermalCondition)
             )
         ]
     }
 
-    private func tempColor(_ celsius: Double) -> Color {
-        switch celsius {
-        case ..<60:   return .green
-        case 60..<75: return .yellow
-        case 75..<90: return .orange
-        default:      return .red
+    private func thermalColor(_ condition: ThermalCondition) -> Color {
+        switch condition {
+        case .nominal: .green
+        case .fair: .yellow
+        case .serious: .orange
+        case .critical: .red
         }
     }
 }
