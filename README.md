@@ -1,7 +1,7 @@
 # StatJack
 
 <p align="center">
-  <img src="https://statjack.burakerenoglu.com/apps/statjack/icon-rounded-20261030.webp" alt="StatJack" width="340" height="340">
+  <img src="https://statjack.burakerenoglu.com/apps/statjack/icon-rounded-20261030.webp" alt="StatJack" width="340">
 </p>
 
 **Lightweight macOS menu bar system monitor.** Track CPU, RAM, Disk, and Network usage at a glance — right from your menu bar.
