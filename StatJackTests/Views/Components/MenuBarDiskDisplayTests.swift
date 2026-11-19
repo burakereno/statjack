@@ -6,8 +6,8 @@ struct MenuBarDiskDisplayTests {
     @Test(arguments: [
         (false, false, Optional<String>.none),
         (true, false, "71%"),
-        (false, true, "120.5 GB"),
-        (true, true, "71% 120.5 GB")
+        (false, true, "74"),
+        (true, true, "71% 74")
     ])
     func diskDisplaysCanBeEnabledIndependently(_ testCase: (Bool, Bool, String?)) {
         let (showUsage, showFree, expected) = testCase
@@ -45,7 +45,7 @@ struct MenuBarDiskDisplayTests {
             cpu: "",
             ram: "",
             disk: "71%",
-            diskFree: "120.5 GB",
+            diskFree: Formatters.menuBarDiskFreeSpace(79_564_269_158),
             net: "",
             gpu: "",
             temp: ""

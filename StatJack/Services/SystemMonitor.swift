@@ -31,7 +31,7 @@ final class SystemMonitor {
     var menuBarCPU: String = "0%"
     var menuBarRAM: String = "0%"
     var menuBarDisk: String = "0%"
-    var menuBarDiskFree: String = "-- GB"
+    var menuBarDiskFree: String = "--"
     var menuBarNet: String = "↑0K ↓0K"
     var menuBarGPU: String = "--"
     var menuBarTemp: String = "OK"
@@ -257,7 +257,7 @@ final class SystemMonitor {
         if sample.diskSampled, let disk = sample.disk {
             diskMonitor.apply(disk)
             menuBarDisk = "\(Int(diskMonitor.diskUsage.usedPercentage))%"
-            menuBarDiskFree = Formatters.formatDiskFreeSpace(disk.available)
+            menuBarDiskFree = Formatters.menuBarDiskFreeSpace(disk.available)
             appendHistory(&diskHistory, value: diskMonitor.diskUsage.usedPercentage)
         }
 
