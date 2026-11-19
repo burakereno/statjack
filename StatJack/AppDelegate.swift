@@ -267,6 +267,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             showCPU: settings.showCPU,
             showRAM: settings.showRAM,
             showDisk: settings.showDisk,
+            showDiskFree: settings.showDiskFree,
             showNetwork: settings.showNetwork,
             showGPU: settings.showGPU,
             showTemperature: settings.showTemperature
@@ -276,12 +277,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             showCPU: settings.showCPU,
             showRAM: settings.showRAM,
             showDisk: settings.showDisk,
+            showDiskFree: settings.showDiskFree,
             showNetwork: settings.showNetwork,
             showGPU: settings.showGPU,
             showTemperature: settings.showTemperature,
             cpu: monitor.menuBarCPU,
             ram: monitor.menuBarRAM,
             disk: monitor.menuBarDisk,
+            diskFree: monitor.menuBarDiskFree,
             net: monitor.menuBarNet,
             gpu: monitor.menuBarGPU,
             temp: monitor.menuBarTemp

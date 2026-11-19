@@ -29,11 +29,12 @@ enum MenuBarDisplay {
         showCPU: Bool,
         showRAM: Bool,
         showDisk: Bool,
+        showDiskFree: Bool,
         showNetwork: Bool,
         showGPU: Bool,
         showTemperature: Bool
     ) -> Bool {
-        iconOnly || (!showCPU && !showRAM && !showDisk && !showNetwork && !showGPU && !showTemperature)
+        iconOnly || (!showCPU && !showRAM && !showDisk && !showDiskFree && !showNetwork && !showGPU && !showTemperature)
     }
 
     static func metricSegments(
@@ -41,12 +42,14 @@ enum MenuBarDisplay {
         showCPU: Bool,
         showRAM: Bool,
         showDisk: Bool,
+        showDiskFree: Bool,
         showNetwork: Bool,
         showGPU: Bool,
         showTemperature: Bool,
         cpu: String,
         ram: String,
         disk: String,
+        diskFree: String,
         net: String,
         gpu: String,
         temp: String
@@ -56,6 +59,7 @@ enum MenuBarDisplay {
             showCPU: showCPU,
             showRAM: showRAM,
             showDisk: showDisk,
+            showDiskFree: showDiskFree,
             showNetwork: showNetwork,
             showGPU: showGPU,
             showTemperature: showTemperature
@@ -74,10 +78,13 @@ enum MenuBarDisplay {
                 width: textSegmentWidth(for: ram)
             ))
         }
-        if showDisk {
+        if showDisk || showDiskFree {
+            let text = [showDisk ? disk : nil, showDiskFree ? diskFree : nil]
+                .compactMap { $0 }
+                .joined(separator: " ")
             segments.append(MenuBarMetricSegment(
-                id: "disk", symbolName: AppIcons.disk, text: disk,
-                width: textSegmentWidth(for: disk)
+                id: "disk", symbolName: AppIcons.disk, text: text,
+                width: textSegmentWidth(for: text)
             ))
         }
         if showNetwork {
@@ -121,10 +128,12 @@ struct MenuBarContentView: View {
     let showCPU: Bool
     let showRAM: Bool
     let showDisk: Bool
+    let showDiskFree: Bool
     let showNetwork: Bool
     let cpu: String
     let ram: String
     let disk: String
+    let diskFree: String
     let net: String
 
     private var showIconOnly: Bool {
@@ -133,6 +142,7 @@ struct MenuBarContentView: View {
             showCPU: showCPU,
             showRAM: showRAM,
             showDisk: showDisk,
+            showDiskFree: showDiskFree,
             showNetwork: showNetwork,
             showGPU: false,
             showTemperature: false
@@ -145,12 +155,14 @@ struct MenuBarContentView: View {
             showCPU: showCPU,
             showRAM: showRAM,
             showDisk: showDisk,
+            showDiskFree: showDiskFree,
             showNetwork: showNetwork,
             showGPU: false,
             showTemperature: false,
             cpu: cpu,
             ram: ram,
             disk: disk,
+            diskFree: diskFree,
             net: net,
             gpu: "",
             temp: ""

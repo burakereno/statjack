@@ -28,12 +28,12 @@
 
 - 📊 **CPU** — total usage with user/system split
 - 🧠 **Memory** — used/total RAM with active / wired / compressed breakdown
-- 💾 **Disk** — used/available root volume space with low-frequency polling
+- 💾 **Disk** — menu bar options for usage percentage and free space in GB; enable either or both
 - 🌐 **Network** — live upload/download speeds + session totals
 - 🎮 **GPU** — utilization via IOAccelerator
 - 🌡️ **Thermal state** — public macOS thermal pressure status (normal, elevated, high, critical)
 - 📈 **Sparklines** — compact trend lines for live metrics
-- 🔔 **Threshold alerts** — macOS notifications when CPU or RAM cross your set %
+- 🔔 **Threshold alerts** — macOS notifications when CPU, RAM, or disk usage reaches your chosen percentage
 - 🚀 **Launch at Login** — system Login Items via SMAppService
 - ⬇️ **One-click in-app updates** — checks GitHub releases, downloads + installs the new DMG without leaving the app
 - ⚡ **Minimal resource usage** — adaptive polling, hidden metrics skipped while idle

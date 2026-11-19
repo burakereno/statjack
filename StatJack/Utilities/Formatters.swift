@@ -40,6 +40,11 @@ enum Formatters {
         }
     }
 
+    /// Keep disk free space in GB, using the same byte units as the disk card.
+    static func formatDiskFreeSpace(_ bytes: UInt64) -> String {
+        String(format: "%.1f GB", Double(bytes) / 1_073_741_824)
+    }
+
     // MARK: - Speed Formatting
 
     /// Format bytes per second to human-readable speed

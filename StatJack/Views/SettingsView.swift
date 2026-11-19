@@ -90,6 +90,16 @@ struct SettingsView: View {
                     Divider().opacity(0.2).padding(.vertical, 2)
 
                     toggleRow(
+                        title: "Disk Free Space",
+                        subtitle: "e.g. 120.5 GB free",
+                        icon: AppIcons.disk,
+                        isOn: $settings.showDiskFree,
+                        disabled: settings.iconOnly
+                    )
+
+                    Divider().opacity(0.2).padding(.vertical, 2)
+
+                    toggleRow(
                         title: "Network Speed",
                         subtitle: "e.g. ↑1.2 ↓3.5",
                         icon: AppIcons.network,
@@ -138,6 +148,16 @@ struct SettingsView: View {
                         icon: AppIcons.ram,
                         isOn: $settings.ramAlertEnabled,
                         threshold: $settings.ramAlertThreshold
+                    )
+
+                    Divider().opacity(0.2).padding(.vertical, 2)
+
+                    alertRow(
+                        title: "Disk Alert",
+                        subtitle: "Notify when disk usage reaches threshold",
+                        icon: AppIcons.disk,
+                        isOn: $settings.diskAlertEnabled,
+                        threshold: $settings.diskAlertThreshold
                     )
                 }
             }

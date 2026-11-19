@@ -31,6 +31,7 @@ final class SystemMonitor {
     var menuBarCPU: String = "0%"
     var menuBarRAM: String = "0%"
     var menuBarDisk: String = "0%"
+    var menuBarDiskFree: String = "-- GB"
     var menuBarNet: String = "↑0K ↓0K"
     var menuBarGPU: String = "--"
     var menuBarTemp: String = "OK"
@@ -56,6 +57,8 @@ final class SystemMonitor {
     private var cpuAlertSnoozed = false
     @ObservationIgnored
     private var ramAlertSnoozed = false
+    @ObservationIgnored
+    private var diskAlertState = DiskAlertState()
     @ObservationIgnored
     private let alertCooldown: TimeInterval = 300
     @ObservationIgnored
@@ -121,6 +124,10 @@ final class SystemMonitor {
     }
 
     func refreshNow() {
+        if !AppSettings.shared.diskAlertEnabled {
+            diskAlertState = DiskAlertState()
+        }
+        lastDiskSample = nil
         tick()
     }
 
@@ -218,7 +225,7 @@ final class SystemMonitor {
         let needsDockTemperature = dockMetric == .temperature
         let needsCPU = (!settings.iconOnly && settings.showCPU) || settings.cpuAlertEnabled || needsDockCPU
         let needsMemory = (!settings.iconOnly && settings.showRAM) || settings.ramAlertEnabled || needsDockMemory
-        let needsDisk = !settings.iconOnly && settings.showDisk
+        let needsDisk = settings.needsDiskMonitoring
         let needsNetwork = !settings.iconOnly && settings.showNetwork
         let needsGPU = (!settings.iconOnly && settings.showGPU) || needsDockGPU
         let needsTemperature = (!settings.iconOnly && settings.showTemperature) || needsDockTemperature
@@ -250,8 +257,11 @@ final class SystemMonitor {
         if sample.diskSampled, let disk = sample.disk {
             diskMonitor.apply(disk)
             menuBarDisk = "\(Int(diskMonitor.diskUsage.usedPercentage))%"
+            menuBarDiskFree = Formatters.formatDiskFreeSpace(disk.available)
             appendHistory(&diskHistory, value: diskMonitor.diskUsage.usedPercentage)
         }
+
+        checkDiskAlert(diskMonitor.diskUsage)
 
         if let network = sample.network {
             networkMonitor.apply(network)
@@ -327,6 +337,21 @@ final class SystemMonitor {
         Self.postAlert(
             title: "High Memory Usage",
             body: "RAM at \(Int(value))% (threshold \(Int(s.ramAlertThreshold))%)"
+        )
+    }
+
+    private func checkDiskAlert(_ usage: DiskUsage) {
+        let settings = AppSettings.shared
+        guard diskAlertState.shouldNotify(
+            usage: usage,
+            enabled: settings.diskAlertEnabled,
+            threshold: settings.diskAlertThreshold,
+            now: Date()
+        ) else { return }
+
+        Self.postAlert(
+            title: "High Disk Usage",
+            body: "Disk at \(Int(usage.usedPercentage))% (threshold \(Int(settings.diskAlertThreshold))%). \(Formatters.formatDiskFreeSpace(usage.available)) free."
         )
     }
 
