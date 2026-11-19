@@ -13,11 +13,11 @@ struct DiskFreeSpaceFormattingTests {
     }
 
     @Test(arguments: [
-        (UInt64(0), "0"),
-        (999_999_999, "0"),
-        (1_000_000_000, "1"),
-        (74_100_000_000, "74"),
-        (4_096_000_000_000, "4096")
+        (UInt64(0), "0GB"),
+        (999_999_999, "0GB"),
+        (1_000_000_000, "1GB"),
+        (74_100_000_000, "74GB"),
+        (4_096_000_000_000, "4096GB")
     ])
     func menuBarShowsOnlyWholeGigabytes(_ testCase: (UInt64, String)) {
         #expect(Formatters.menuBarDiskFreeSpace(testCase.0) == testCase.1)

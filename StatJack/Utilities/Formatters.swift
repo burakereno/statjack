@@ -48,7 +48,7 @@ enum Formatters {
     }
 
     static func menuBarDiskFreeSpace(_ bytes: UInt64) -> String {
-        String(bytes / bytesPerDiskGB)
+        "\(bytes / bytesPerDiskGB)GB"
     }
 
     static func formatDiskCapacity(_ bytes: UInt64) -> String {

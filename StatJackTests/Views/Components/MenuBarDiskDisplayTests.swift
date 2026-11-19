@@ -6,8 +6,8 @@ struct MenuBarDiskDisplayTests {
     @Test(arguments: [
         (false, false, Optional<String>.none),
         (true, false, "71%"),
-        (false, true, "74"),
-        (true, true, "71% 74")
+        (false, true, "74GB"),
+        (true, true, "71% 74GB")
     ])
     func diskDisplaysCanBeEnabledIndependently(_ testCase: (Bool, Bool, String?)) {
         let (showUsage, showFree, expected) = testCase

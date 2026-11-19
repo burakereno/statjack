@@ -91,7 +91,7 @@ struct SettingsView: View {
 
                     toggleRow(
                         title: "Disk Free Space",
-                        subtitle: "Free GB now, excluding purgeable space",
+                        subtitle: "e.g. 74GB, excluding purgeable space",
                         icon: AppIcons.disk,
                         isOn: $settings.showDiskFree,
                         disabled: settings.iconOnly
