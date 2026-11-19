@@ -79,6 +79,7 @@ enum UpdateSecurity {
         return hasher.finalize().map { String(format: "%02x", $0) }.joined()
     }
 
+    @discardableResult
     static func launchInstaller(
         parentPID: Int32,
         dmgURL: URL,
@@ -88,7 +89,7 @@ enum UpdateSecurity {
         appBundleName: String,
         executableName: String,
         expectedSHA256: String
-    ) throws {
+    ) throws -> Process {
         let workDirectory = dmgURL.deletingLastPathComponent()
         let scriptURL = workDirectory.appendingPathComponent("install-update.sh")
         try installerScript.write(to: scriptURL, atomically: true, encoding: .utf8)
@@ -112,6 +113,7 @@ enum UpdateSecurity {
             workDirectory.path,
         ]
         try process.run()
+        return process
     }
 
     private static let installerScript = #"""
@@ -133,8 +135,8 @@ enum UpdateSecurity {
     LOG="$WORK_DIR/install.log"
     MOUNT_POINT="$WORK_DIR/mount"
     TARGET_PARENT="$(/usr/bin/dirname "$TARGET")"
-    STAGED_APP="$TARGET_PARENT/.$EXECUTABLE_NAME.update.$$"
-    BACKUP_APP="$TARGET_PARENT/.$EXECUTABLE_NAME.previous.$$"
+    STAGED_APP="$TARGET_PARENT/.$EXECUTABLE_NAME.update.$.app"
+    BACKUP_APP="$TARGET_PARENT/.$EXECUTABLE_NAME.previous.$.app"
     MOUNT_ATTACHED=0
 
     exec >"$LOG" 2>&1
@@ -227,13 +229,18 @@ enum UpdateSecurity {
     fi
     /bin/mv "$STAGED_APP" "$TARGET" || fail "could not install staged app"
 
-    /usr/bin/open "$TARGET" || fail "could not request app launch"
+    installed_version=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$TARGET/Contents/Info.plist") || fail "could not read installed version"
+    [ "$installed_version" = "$EXPECTED_VERSION" ] || fail "installed version mismatch"
+    /usr/bin/open -n "$TARGET" || fail "could not request app launch"
     LAUNCHED=0
     for _ in $(/usr/bin/seq 1 100); do
-        if /usr/bin/pgrep -x "$EXECUTABLE_NAME" >/dev/null 2>&1; then
-            LAUNCHED=1
-            break
-        fi
+        for pid in $(/usr/bin/pgrep -x "$EXECUTABLE_NAME"); do
+            # Match the executable vnode, not just the process name or bundle ID.
+            if /usr/sbin/lsof -nP -a -p "$pid" -d txt "$TARGET/Contents/MacOS/$EXECUTABLE_NAME" >/dev/null 2>&1; then
+                LAUNCHED=1
+                break 2
+            fi
+        done
         /bin/sleep 0.1
     done
     [ "$LAUNCHED" = "1" ] || fail "new app did not launch"

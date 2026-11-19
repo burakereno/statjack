@@ -4,10 +4,11 @@ import Testing
 @MainActor
 struct FormattingAndVersionTests {
     @Test
-    func compactSpeedKeepsMenuBarValuesBounded() {
+    func compactSpeedPreservesHundredsWithinEachUnit() {
         #expect(Formatters.formatSpeedCompact(0) == "0K")
         #expect(Formatters.formatSpeedCompact(1_024) == "1K")
-        #expect(Formatters.formatSpeedCompact(100 * 1_024) == "99K")
+        #expect(Formatters.formatSpeedCompact(100 * 1_024) == "100K")
+        #expect(Formatters.formatSpeedCompact(500 * 1_024 * 1_024) == "500M")
         #expect(Formatters.formatSpeedCompact(2 * 1_024 * 1_024) == "2M")
     }
 

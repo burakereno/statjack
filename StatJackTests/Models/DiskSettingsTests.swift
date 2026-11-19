@@ -62,4 +62,27 @@ struct DiskSettingsTests {
 
         #expect(AppSettings(defaults: defaults).needsDiskMonitoring == expected)
     }
+
+    @Test
+    func idleIconDoesNotPollUntilAMetricIsNeeded() throws {
+        let suite = "StatJack.IdleTests.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        defaults.set(true, forKey: "iconOnly")
+        let settings = AppSettings(defaults: defaults)
+        let monitor = SystemMonitor(settings: settings)
+        defer { monitor.stopMonitoring() }
+        #expect(monitor.isPolling == false)
+        monitor.startMonitoring(interval: 2, collectAllMetrics: true)
+        #expect(monitor.isPolling)
+        monitor.startMonitoring(interval: 10)
+        #expect(monitor.isPolling == false)
+    }
+
+    @Test
+    func unknownDiskSpaceIsNotAFullDisk() {
+        #expect(DiskMonitor.measuredUsage(total: 500, free: nil) == nil)
+        #expect(DiskMonitor.measuredUsage(total: 0, free: 0) == nil)
+        #expect(DiskMonitor.measuredUsage(total: 500, free: 0)?.usedPercentage == 100)
+    }
 }

@@ -40,15 +40,19 @@ enum Formatters {
         }
     }
 
-    private static let bytesPerDiskGB: UInt64 = 1_073_741_824
+    private static let bytesPerDiskGB: UInt64 = 1_000_000_000
 
-    /// Keep disk free space in GB, using the same byte units as the disk card.
+    /// Disk capacity uses decimal GB; memory and transfer rates use binary units.
     static func formatDiskFreeSpace(_ bytes: UInt64) -> String {
         String(format: "%.1f GB", Double(bytes) / Double(bytesPerDiskGB))
     }
 
     static func menuBarDiskFreeSpace(_ bytes: UInt64) -> String {
         String(bytes / bytesPerDiskGB)
+    }
+
+    static func formatDiskCapacity(_ bytes: UInt64) -> String {
+        String(format: "%.1fG", Double(bytes) / Double(bytesPerDiskGB))
     }
 
     // MARK: - Speed Formatting
@@ -66,25 +70,13 @@ enum Formatters {
         return String(format: "%.0f B/s", bytesPerSecond)
     }
 
-    /// Format speed for menu bar (compact). The numeric part is capped at two
-    /// digits per unit so network segments stay readable in tight menu-bar space.
+    /// Use the actual rounded rate; 500K and 500M must not both saturate at 99.
     static func formatSpeedCompact(_ bytesPerSecond: Double) -> String {
-        let kbps = bytesPerSecond / 1_024
-        let mbps = kbps / 1_024
-        let gbps = mbps / 1_024
-
-        if gbps >= 1 {
-            return "\(cappedTwoDigitSpeed(gbps))G"
-        } else if mbps >= 1 {
-            return "\(cappedTwoDigitSpeed(mbps))M"
-        } else if kbps >= 1 {
-            return "\(cappedTwoDigitSpeed(kbps))K"
+        let units: [(Double, String)] = [(1_073_741_824, "G"), (1_048_576, "M"), (1_024, "K")]
+        for (divisor, suffix) in units where bytesPerSecond >= divisor {
+            return String(format: "%.0f", bytesPerSecond / divisor) + suffix
         }
         return "0K"
-    }
-
-    private static func cappedTwoDigitSpeed(_ value: Double) -> Int {
-        min(99, max(1, Int(value.rounded())))
     }
 
     // MARK: - Time Formatting

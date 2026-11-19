@@ -40,6 +40,10 @@ enum MenuBarRefreshInterval: Double, CaseIterable, Identifiable, Sendable {
     }
 }
 
+enum AlertPermission {
+    case unknown, allowed, blocked
+}
+
 /// Persistent app settings with native toggle support
 @Observable
 @MainActor
@@ -170,11 +174,41 @@ final class AppSettings {
         }
     }
 
+    private(set) var alertPermission: AlertPermission = .unknown
+    @ObservationIgnored private var permissionRequestInFlight = false
+    @ObservationIgnored private var permissionGeneration = 0
+
+    var wantsAlerts: Bool { cpuAlertEnabled || ramAlertEnabled || diskAlertEnabled }
+
+    func refreshAlertPermission(ask: Bool = false) {
+        guard wantsAlerts, !permissionRequestInFlight else { return }
+        permissionRequestInFlight = ask
+        permissionGeneration += 1
+        let generation = permissionGeneration
+        Task {
+            let center = UNUserNotificationCenter.current()
+            if ask { _ = try? await center.requestAuthorization(options: [.alert, .sound]) }
+            let status = await center.notificationSettings().authorizationStatus
+            guard generation == permissionGeneration else { return }
+            permissionRequestInFlight = false
+            let permission: AlertPermission = switch status {
+            case .authorized, .provisional: .allowed
+            case .denied: .blocked
+            default: .unknown
+            }
+            if permission != alertPermission {
+                alertPermission = permission
+                notifyChanged(refreshDisk: diskAlertEnabled && permission == .allowed)
+            }
+        }
+    }
+
     /// Notify when CPU usage exceeds threshold
     var cpuAlertEnabled: Bool {
         didSet {
             defaults.set(cpuAlertEnabled, forKey: "cpuAlertEnabled")
-            if cpuAlertEnabled { Self.requestNotificationAuth() }
+            if cpuAlertEnabled { refreshAlertPermission(ask: true) }
+            notifyChanged()
         }
     }
 
@@ -187,7 +221,8 @@ final class AppSettings {
     var ramAlertEnabled: Bool {
         didSet {
             defaults.set(ramAlertEnabled, forKey: "ramAlertEnabled")
-            if ramAlertEnabled { Self.requestNotificationAuth() }
+            if ramAlertEnabled { refreshAlertPermission(ask: true) }
+            notifyChanged()
         }
     }
 
@@ -200,20 +235,16 @@ final class AppSettings {
     var diskAlertEnabled: Bool {
         didSet {
             defaults.set(diskAlertEnabled, forKey: "diskAlertEnabled")
-            if diskAlertEnabled { Self.requestNotificationAuth() }
-            notifyChanged()
+            if diskAlertEnabled { refreshAlertPermission(ask: true) }
+            notifyChanged(refreshDisk: diskAlertEnabled)
         }
     }
 
     var diskAlertThreshold: Double {
         didSet {
             defaults.set(diskAlertThreshold, forKey: "diskAlertThreshold")
-            notifyChanged()
+            notifyChanged(refreshDisk: diskAlertEnabled)
         }
-    }
-
-    private static func requestNotificationAuth() {
-        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
     }
 
     private static var isLaunchAtLoginEnabled: Bool {
@@ -240,8 +271,8 @@ final class AppSettings {
         }
     }
 
-    private func notifyChanged() {
-        NotificationCenter.default.post(name: .statJackSettingsChanged, object: self)
+    private func notifyChanged(refreshDisk: Bool = false) {
+        NotificationCenter.default.post(name: .statJackSettingsChanged, object: self, userInfo: ["refreshDisk": refreshDisk])
     }
 
     init(defaults: UserDefaults = .standard) {

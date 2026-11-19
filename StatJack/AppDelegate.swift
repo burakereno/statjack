@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import UserNotifications
 
 enum StatJackPopoverLayout {
     static let width: CGFloat = 320
@@ -15,7 +16,7 @@ enum StatJackPopoverLayout {
 
 /// AppDelegate managing NSStatusItem + NSPopover for full menu bar control
 @MainActor
-final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, UNUserNotificationCenterDelegate {
     private var statusItem: NSStatusItem!
     private var popover: NSPopover!
     private var monitor: SystemMonitor!
@@ -45,6 +46,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        UNUserNotificationCenter.current().delegate = self
         monitor = SystemMonitor()
         applyActivationPolicy()
 
@@ -80,11 +82,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
 
         let center = NotificationCenter.default
         center.addObserver(self, selector: #selector(settingsChanged),
-                           name: .statJackSettingsChanged, object: nil)
+                           name: .statJackSettingsChanged, object: AppSettings.shared)
         center.addObserver(self, selector: #selector(valuesChanged),
-                           name: .statJackValuesChanged, object: nil)
+                           name: .statJackValuesChanged, object: monitor)
 
+        AppSettings.shared.refreshAlertPermission(ask: AppSettings.shared.wantsAlerts)
         UpdateChecker.shared.start()
+    }
+
+    nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter,
+                                            willPresent notification: UNNotification) async -> UNNotificationPresentationOptions {
+        [.banner, .list, .sound]
     }
 
     func applicationWillTerminate(_ notification: Notification) {
@@ -92,10 +100,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         monitor?.stopMonitoring()
     }
 
-    @objc private func settingsChanged() {
+    @objc private func settingsChanged(_ note: Notification) {
         applyActivationPolicy()
         updateMonitoringMode()
-        monitor.refreshNow()
+        monitor.refreshNow(forceDisk: note.userInfo?["refreshDisk"] as? Bool == true)
         updateMenuBarButton()
         updateDockBadge()
     }
@@ -113,6 +121,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         if popover.isShown {
             closePopover()
         } else {
+            AppSettings.shared.refreshAlertPermission()
             NSApp.activate(ignoringOtherApps: true)
             applyPreferredPopoverHeight(for: button.window?.screen)
             popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)

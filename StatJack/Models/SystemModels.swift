@@ -78,16 +78,20 @@ struct NetworkUsage: Equatable, Sendable {
 
 /// Raw CPU counters sampled off the main thread, then applied on main.
 struct CPUSample: Equatable, Sendable {
-    let user: UInt64
-    let system: UInt64
-    let idle: UInt64
-    let nice: UInt64
+    struct Ticks: Equatable, Sendable {
+        let user, system, idle, nice: UInt32
+    }
+    let cores: [Ticks]
 }
 
 /// Raw network counters sampled off the main thread, then applied on main.
-struct NetworkSample: Equatable, Sendable {
+struct InterfaceCounters: Equatable, Sendable {
     let bytesIn: UInt64
     let bytesOut: UInt64
+}
+
+struct NetworkSample: Equatable, Sendable {
+    let interfaces: [String: InterfaceCounters]
     let timestamp: TimeInterval
 }
 

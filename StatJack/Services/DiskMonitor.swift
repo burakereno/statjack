@@ -11,21 +11,18 @@ final class DiskMonitor {
             let url = URL(fileURLWithPath: "/")
             let values = try url.resourceValues(forKeys: [
                 .volumeTotalCapacityKey,
-                .volumeAvailableCapacityForImportantUsageKey,
                 .volumeAvailableCapacityKey
             ])
 
-            guard let total = values.volumeTotalCapacity else { return nil }
-            let available = values.volumeAvailableCapacityForImportantUsage
-                ?? Int64(values.volumeAvailableCapacity ?? 0)
-
-            return DiskUsage(
-                total: UInt64(max(total, 0)),
-                available: UInt64(max(available, 0))
-            )
+            return measuredUsage(total: values.volumeTotalCapacity, free: values.volumeAvailableCapacity)
         } catch {
             return nil
         }
+    }
+
+    nonisolated static func measuredUsage(total: Int?, free: Int?) -> DiskUsage? {
+        guard let total, total > 0, let free, (0...total).contains(free) else { return nil }
+        return DiskUsage(total: UInt64(total), available: UInt64(free))
     }
 
     func apply(_ usage: DiskUsage) {

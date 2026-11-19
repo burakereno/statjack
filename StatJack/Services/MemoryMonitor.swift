@@ -23,11 +23,13 @@ final class MemoryMonitor {
         var count = mach_msg_type_number_t(MemoryLayout<vm_statistics64>.size / MemoryLayout<integer_t>.size)
         var pageSize: vm_size_t = 0
 
-        guard host_page_size(mach_host_self(), &pageSize) == KERN_SUCCESS else { return nil }
+        let host = mach_host_self()
+        defer { mach_port_deallocate(mach_task_self_, host) }
+        guard host_page_size(host, &pageSize) == KERN_SUCCESS else { return nil }
 
         let result = withUnsafeMutablePointer(to: &stats) { statsPtr in
             statsPtr.withMemoryRebound(to: integer_t.self, capacity: Int(count)) { ptr in
-                host_statistics64(mach_host_self(), HOST_VM_INFO64, ptr, &count)
+                host_statistics64(host, HOST_VM_INFO64, ptr, &count)
             }
         }
 

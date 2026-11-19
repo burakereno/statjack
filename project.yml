@@ -23,8 +23,8 @@ targets:
     info:
       path: StatJack/Info.plist
       properties:
-        CFBundleShortVersionString: "1.0.43"
-        CFBundleVersion: "43"
+        CFBundleShortVersionString: "1.0.44"
+        CFBundleVersion: "44"
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.statjack.app
@@ -33,6 +33,9 @@ targets:
         GENERATE_INFOPLIST_FILE: false
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         CLANG_ENABLE_MODULES: "YES"
+      configs:
+        Debug:
+          PRODUCT_BUNDLE_IDENTIFIER: com.statjack.app.debug
     entitlements:
       path: StatJack/StatJack.entitlements
 

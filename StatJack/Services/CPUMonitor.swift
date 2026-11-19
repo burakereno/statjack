@@ -20,15 +20,17 @@ final class CPUMonitor {
 
     /// Previous CPU ticks for delta calculation
     @ObservationIgnored
-    private var previousCPUTicks: (user: UInt64, system: UInt64, idle: UInt64, nice: UInt64)?
+    private var previous: CPUSample?
 
     nonisolated static func sample() -> CPUSample? {
         var numCPUs: natural_t = 0
         var cpuInfo: processor_info_array_t?
         var numCPUInfo: mach_msg_type_number_t = 0
 
+        let host = mach_host_self()
+        defer { mach_port_deallocate(mach_task_self_, host) }
         let result = host_processor_info(
-            mach_host_self(),
+            host,
             PROCESSOR_CPU_LOAD_INFO,
             &numCPUs,
             &cpuInfo,
@@ -45,37 +47,32 @@ final class CPUMonitor {
             )
         }
 
-        var totalUser: UInt64 = 0
-        var totalSystem: UInt64 = 0
-        var totalIdle: UInt64 = 0
-        var totalNice: UInt64 = 0
-
-        for i in 0..<Int(numCPUs) {
+        let cores = (0..<Int(numCPUs)).map { i in
             let offset = Int(CPU_STATE_MAX) * i
-            totalUser += UInt64(cpuInfo[offset + Int(CPU_STATE_USER)])
-            totalSystem += UInt64(cpuInfo[offset + Int(CPU_STATE_SYSTEM)])
-            totalIdle += UInt64(cpuInfo[offset + Int(CPU_STATE_IDLE)])
-            totalNice += UInt64(cpuInfo[offset + Int(CPU_STATE_NICE)])
+            return CPUSample.Ticks(
+                user: UInt32(bitPattern: cpuInfo[offset + Int(CPU_STATE_USER)]),
+                system: UInt32(bitPattern: cpuInfo[offset + Int(CPU_STATE_SYSTEM)]),
+                idle: UInt32(bitPattern: cpuInfo[offset + Int(CPU_STATE_IDLE)]),
+                nice: UInt32(bitPattern: cpuInfo[offset + Int(CPU_STATE_NICE)])
+            )
         }
-
-        return CPUSample(user: totalUser, system: totalSystem, idle: totalIdle, nice: totalNice)
+        return CPUSample(cores: cores)
     }
 
     func apply(_ sample: CPUSample) {
-        if let prev = previousCPUTicks {
-            let deltaUser = sample.user >= prev.user ? sample.user - prev.user : 0
-            let deltaSystem = sample.system >= prev.system ? sample.system - prev.system : 0
-            let deltaIdle = sample.idle >= prev.idle ? sample.idle - prev.idle : 0
-            let deltaNice = sample.nice >= prev.nice ? sample.nice - prev.nice : 0
-            let totalDelta = deltaUser + deltaSystem + deltaIdle + deltaNice
-
-            if totalDelta > 0 {
-                userUsage = Double(deltaUser + deltaNice) / Double(totalDelta) * 100
-                systemUsage = Double(deltaSystem) / Double(totalDelta) * 100
-                totalUsage = userUsage + systemUsage
-            }
+        defer { previous = sample }
+        guard let previous, previous.cores.count == sample.cores.count else { return }
+        var user: UInt64 = 0, system: UInt64 = 0, idle: UInt64 = 0
+        for (old, new) in zip(previous.cores, sample.cores) {
+            // Mach ticks wrap independently on each core and in each state.
+            user += UInt64(new.user &- old.user) + UInt64(new.nice &- old.nice)
+            system += UInt64(new.system &- old.system)
+            idle += UInt64(new.idle &- old.idle)
         }
-
-        previousCPUTicks = (sample.user, sample.system, sample.idle, sample.nice)
+        let total = user + system + idle
+        guard total > 0 else { return }
+        userUsage = Double(user) / Double(total) * 100
+        systemUsage = Double(system) / Double(total) * 100
+        totalUsage = userUsage + systemUsage
     }
 }

@@ -28,15 +28,15 @@
 
 - 📊 **CPU** — total usage with user/system split
 - 🧠 **Memory** — used/total RAM with active / wired / compressed breakdown
-- 💾 **Disk** — menu bar options for usage percentage and free space in GB; enable either or both
-- 🌐 **Network** — live upload/download speeds + session totals
+- 💾 **Disk** — show usage, whole free gigabytes, or both in the menu bar. Free space excludes purgeable files; disk alerts use the same measurement
+- 🌐 **Network** — live upload/download speeds and session totals across network interface changes
 - 🎮 **GPU** — utilization via IOAccelerator
 - 🌡️ **Thermal state** — public macOS thermal pressure status (normal, elevated, high, critical)
 - 📈 **Sparklines** — compact trend lines for live metrics
 - 🔔 **Threshold alerts** — macOS notifications when CPU, RAM, or disk usage reaches your chosen percentage
 - 🚀 **Launch at Login** — system Login Items via SMAppService
 - ⬇️ **One-click in-app updates** — checks GitHub releases, downloads + installs the new DMG without leaving the app
-- ⚡ **Minimal resource usage** — adaptive polling, hidden metrics skipped while idle
+- ⚡ **Minimal resource usage** — polling stops when the panel is closed and no metric or alert needs it
 - 🖥️ **Native macOS** — SwiftUI + AppKit, runs as a menu bar app
 
 ## Screenshots
@@ -88,7 +88,7 @@ xcodebuild -project StatJack.xcodeproj -scheme StatJack -configuration Release b
 - **SwiftUI** — UI framework
 - **AppKit** — NSStatusItem, NSPopover, event monitoring
 - **Mach/sysctl** — CPU & memory stats via kernel APIs
-- **getifaddrs** — Network throughput monitoring
+- **NET_RT_IFLIST2** — 64-bit network counters for each active interface
 - **XcodeGen** — Project file generation
 
 ## License

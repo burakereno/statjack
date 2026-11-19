@@ -5,6 +5,10 @@ on:
     branches:
       - main
 
+concurrency:
+  group: statjack-production-release
+  queue: max
+
 permissions:
   contents: write
 
@@ -92,6 +96,7 @@ jobs:
       - name: Auto Version
         id: version
         run: |
+          git fetch --tags origin
           # Get latest tag, default to v1.0.0 if none exists
           LATEST=$(git tag -l 'v*' --sort=-v:refname | head -1)
           if [ -z "$LATEST" ]; then
@@ -114,6 +119,11 @@ jobs:
       - name: Generate Xcode Project
         run: xcodegen generate
 
+      - name: Run regression tests
+        run: |
+          xcodebuild -project StatJack.xcodeproj -scheme StatJack -configuration Debug \
+            -destination 'platform=macOS,arch=arm64' test CODE_SIGNING_ALLOWED=NO
+
       - name: Patch Info.plist with computed version
         run: |
           VERSION="${{ steps.version.outputs.version }}"
@@ -121,6 +131,7 @@ jobs:
           BUILD_NUMBER=$(echo "$SHORT_VERSION" | cut -d. -f3)
           /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $SHORT_VERSION" StatJack/Info.plist
           /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD_NUMBER" StatJack/Info.plist
+          /usr/libexec/PlistBuddy -c "Add :StatJackDistribution bool true" StatJack/Info.plist
           echo "📌 Info.plist version pinned to $SHORT_VERSION (build $BUILD_NUMBER)"
           /usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" StatJack/Info.plist
           /usr/libexec/PlistBuddy -c "Print :CFBundleVersion" StatJack/Info.plist
@@ -251,6 +262,13 @@ jobs:
           }
           JSON
           node -e 'JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"))' "$MANIFEST_ASSET_NAME"
+      - name: Test signed update installation
+        timeout-minutes: 4
+        run: |
+          xcrun swiftc scripts/update-smoke/main.swift StatJack/Services/UpdateSecurity.swift -o "$RUNNER_TEMP/test-installer"
+          TAG="${{ steps.version.outputs.version }}"
+          "$RUNNER_TEMP/test-installer" "$DMG_ASSET_NAME" "$MANIFEST_ASSET_NAME" "${TAG#v}" "build/Release/$APP_BUNDLE_NAME"
+
       - name: Create Tag
         run: |
           git config user.name "github-actions"

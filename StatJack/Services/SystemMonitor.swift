@@ -15,6 +15,7 @@ final class SystemMonitor {
         let network: Bool
         let gpu: Bool
         let thermal: Bool
+        var any: Bool { cpu || memory || disk || network || gpu || thermal }
     }
 
     let cpuMonitor = CPUMonitor()
@@ -30,7 +31,7 @@ final class SystemMonitor {
     /// Individual menu bar display values
     var menuBarCPU: String = "0%"
     var menuBarRAM: String = "0%"
-    var menuBarDisk: String = "0%"
+    var menuBarDisk: String = "--"
     var menuBarDiskFree: String = "--"
     var menuBarNet: String = "↑0K ↓0K"
     var menuBarGPU: String = "--"
@@ -49,20 +50,10 @@ final class SystemMonitor {
     @ObservationIgnored
     static let historyCapacity = 60
 
-    @ObservationIgnored
-    private var lastCPUAlert: Date?
-    @ObservationIgnored
-    private var lastRAMAlert: Date?
-    @ObservationIgnored
-    private var cpuAlertSnoozed = false
-    @ObservationIgnored
-    private var ramAlertSnoozed = false
-    @ObservationIgnored
-    private var diskAlertState = DiskAlertState()
-    @ObservationIgnored
-    private let alertCooldown: TimeInterval = 300
-    @ObservationIgnored
-    private let alertResetMargin: Double = 5
+    @ObservationIgnored private let cpuAlert = UsageAlert()
+    @ObservationIgnored private let ramAlert = UsageAlert()
+    @ObservationIgnored private let diskAlert = UsageAlert()
+    @ObservationIgnored private var diskSelected = false
 
     @ObservationIgnored
     private var timer: Timer?
@@ -87,21 +78,27 @@ final class SystemMonitor {
     @ObservationIgnored
     private let bootDate: Date?
 
-    init() {
+    @ObservationIgnored private let settings: AppSettings
+    var isPolling: Bool { timer != nil }
+
+    init(settings: AppSettings? = nil) {
+        self.settings = settings ?? .shared
         bootDate = Self.loadBootDate()
-        tick()
-        startMonitoring(interval: AppSettings.shared.menuBarRefreshInterval.rawValue)
+        startMonitoring(interval: self.settings.menuBarRefreshInterval.rawValue)
+        refreshNow()
     }
 
     /// Starts (or reschedules) the repeating update timer at the given
     /// interval. Callers pass a slower interval when the popover is closed
     /// and a faster one while it's open.
     func startMonitoring(interval: TimeInterval, collectAllMetrics: Bool = false) {
-        guard currentInterval != interval
-            || self.collectAllMetrics != collectAllMetrics
-            || timer == nil else { return }
-        currentInterval = interval
         self.collectAllMetrics = collectAllMetrics
+        let selection = metricSelection()
+        if selection.disk && !diskSelected { lastDiskSample = nil }
+        diskSelected = selection.disk
+        guard selection.any else { stopMonitoring(); return }
+        guard currentInterval != interval || timer == nil else { return }
+        currentInterval = interval
 
         timer?.invalidate()
         let timer = Timer(timeInterval: interval, repeats: true) { [weak self] _ in
@@ -123,12 +120,12 @@ final class SystemMonitor {
         samplingTask = nil
     }
 
-    func refreshNow() {
-        if !AppSettings.shared.diskAlertEnabled {
-            diskAlertState = DiskAlertState()
-        }
-        lastDiskSample = nil
-        tick()
+    func refreshNow(forceDisk: Bool = false) {
+        if !settings.cpuAlertEnabled { cpuAlert.reset() }
+        if !settings.ramAlertEnabled { ramAlert.reset() }
+        if !settings.diskAlertEnabled { diskAlert.reset() }
+        if forceDisk { lastDiskSample = nil }
+        if timer != nil { tick() }
     }
 
     /// One monitoring tick. Heavy work (the three Mach/sysctl calls) is kept
@@ -158,8 +155,9 @@ final class SystemMonitor {
             )
             guard !Task.isCancelled, let self else { return }
 
+            await self.apply(sample)
+            guard !Task.isCancelled else { return }
             self.samplingTask = nil
-            self.apply(sample)
             self.isUpdating = false
             NotificationCenter.default.post(name: .statJackValuesChanged, object: self)
             self.runPendingRefreshIfNeeded()
@@ -217,7 +215,6 @@ final class SystemMonitor {
             return MetricSelection(cpu: true, memory: true, disk: true, network: true, gpu: true, thermal: true)
         }
 
-        let settings = AppSettings.shared
         let dockMetric = settings.showDockIcon && settings.showDockBadge ? settings.dockBadgeMetric : nil
         let needsDockCPU = dockMetric == .cpu
         let needsDockMemory = dockMetric == .ram
@@ -239,29 +236,49 @@ final class SystemMonitor {
         )
     }
 
-    private func apply(_ sample: SystemSample) {
+    private func apply(_ sample: SystemSample) async {
         if let cpu = sample.cpu {
             cpuMonitor.apply(cpu)
             menuBarCPU = "\(Int(cpuMonitor.totalUsage))%"
             appendHistory(&cpuHistory, value: cpuMonitor.totalUsage)
-            checkCPUAlert(cpuMonitor.totalUsage)
+            if settings.cpuAlertEnabled {
+                await cpuAlert.evaluate(value: cpuMonitor.totalUsage, threshold: settings.cpuAlertThreshold,
+                                        authorized: settings.alertPermission == .allowed) {
+                    try await Self.postAlert(title: "High CPU Usage", body: "CPU at \(Int(cpuMonitor.totalUsage))% (threshold \(Int(settings.cpuAlertThreshold))%).")
+                }
+            }
         }
 
         if let memory = sample.memory {
             memoryMonitor.apply(memory)
             menuBarRAM = "\(Int(memoryMonitor.memoryUsage.usedPercentage))%"
             appendHistory(&ramHistory, value: memoryMonitor.memoryUsage.usedPercentage)
-            checkRAMAlert(memoryMonitor.memoryUsage.usedPercentage)
+            if settings.ramAlertEnabled {
+                let value = memoryMonitor.memoryUsage.usedPercentage
+                await ramAlert.evaluate(value: value, threshold: settings.ramAlertThreshold,
+                                        authorized: settings.alertPermission == .allowed) {
+                    try await Self.postAlert(title: "High Memory Usage", body: "RAM at \(Int(value))% (threshold \(Int(settings.ramAlertThreshold))%).")
+                }
+            }
         }
 
+        if sample.diskSampled && sample.disk == nil {
+            diskMonitor.apply(DiskUsage(total: 0, available: 0))
+            menuBarDisk = "--"
+            menuBarDiskFree = "--"
+        }
         if sample.diskSampled, let disk = sample.disk {
             diskMonitor.apply(disk)
             menuBarDisk = "\(Int(diskMonitor.diskUsage.usedPercentage))%"
             menuBarDiskFree = Formatters.menuBarDiskFreeSpace(disk.available)
-            appendHistory(&diskHistory, value: diskMonitor.diskUsage.usedPercentage)
+            appendHistory(&diskHistory, value: disk.usedPercentage)
+            if settings.diskAlertEnabled {
+                await diskAlert.evaluate(value: disk.usedPercentage, threshold: settings.diskAlertThreshold,
+                                         authorized: settings.alertPermission == .allowed) {
+                    try await Self.postAlert(title: "High Disk Usage", body: "Disk at \(Int(disk.usedPercentage))% (threshold \(Int(settings.diskAlertThreshold))%). \(Formatters.formatDiskFreeSpace(disk.available)) free.")
+                }
+            }
         }
-
-        checkDiskAlert(diskMonitor.diskUsage)
 
         if let network = sample.network {
             networkMonitor.apply(network)
@@ -300,62 +317,7 @@ final class SystemMonitor {
         }
     }
 
-    private func checkCPUAlert(_ value: Double) {
-        let s = AppSettings.shared
-        guard s.cpuAlertEnabled else {
-            cpuAlertSnoozed = false
-            return
-        }
-        if value < max(0, s.cpuAlertThreshold - alertResetMargin) {
-            cpuAlertSnoozed = false
-            return
-        }
-        guard value >= s.cpuAlertThreshold, !cpuAlertSnoozed else { return }
-        if let last = lastCPUAlert, Date().timeIntervalSince(last) < alertCooldown { return }
-        lastCPUAlert = Date()
-        cpuAlertSnoozed = true
-        Self.postAlert(
-            title: "High CPU Usage",
-            body: "CPU at \(Int(value))% (threshold \(Int(s.cpuAlertThreshold))%)"
-        )
-    }
-
-    private func checkRAMAlert(_ value: Double) {
-        let s = AppSettings.shared
-        guard s.ramAlertEnabled else {
-            ramAlertSnoozed = false
-            return
-        }
-        if value < max(0, s.ramAlertThreshold - alertResetMargin) {
-            ramAlertSnoozed = false
-            return
-        }
-        guard value >= s.ramAlertThreshold, !ramAlertSnoozed else { return }
-        if let last = lastRAMAlert, Date().timeIntervalSince(last) < alertCooldown { return }
-        lastRAMAlert = Date()
-        ramAlertSnoozed = true
-        Self.postAlert(
-            title: "High Memory Usage",
-            body: "RAM at \(Int(value))% (threshold \(Int(s.ramAlertThreshold))%)"
-        )
-    }
-
-    private func checkDiskAlert(_ usage: DiskUsage) {
-        let settings = AppSettings.shared
-        guard diskAlertState.shouldNotify(
-            usage: usage,
-            enabled: settings.diskAlertEnabled,
-            threshold: settings.diskAlertThreshold,
-            now: Date()
-        ) else { return }
-
-        Self.postAlert(
-            title: "High Disk Usage",
-            body: "Disk at \(Int(usage.usedPercentage))% (threshold \(Int(settings.diskAlertThreshold))%). \(Formatters.formatDiskFreeSpace(usage.available)) free."
-        )
-    }
-
-    private static func postAlert(title: String, body: String) {
+    private static func postAlert(title: String, body: String) async throws {
         let content = UNMutableNotificationContent()
         content.title = title
         content.body = body
@@ -365,7 +327,7 @@ final class SystemMonitor {
             content: content,
             trigger: nil
         )
-        UNUserNotificationCenter.current().add(request)
+        try await UNUserNotificationCenter.current().add(request)
     }
 
     private func updateUptime() {

@@ -91,7 +91,7 @@ struct SettingsView: View {
 
                     toggleRow(
                         title: "Disk Free Space",
-                        subtitle: "Whole gigabytes, e.g. 74",
+                        subtitle: "Free GB now, excluding purgeable space",
                         icon: AppIcons.disk,
                         isOn: $settings.showDiskFree,
                         disabled: settings.iconOnly
@@ -101,7 +101,7 @@ struct SettingsView: View {
 
                     toggleRow(
                         title: "Network Speed",
-                        subtitle: "e.g. ↑1.2 ↓3.5",
+                        subtitle: "e.g. ↑500K ↓2M",
                         icon: AppIcons.network,
                         isOn: $settings.showNetwork,
                         disabled: settings.iconOnly
@@ -132,6 +132,14 @@ struct SettingsView: View {
             // Alerts
             MetricCardView(title: "Alerts", systemImage: "bell", showIcon: false) {
                 VStack(spacing: 0) {
+                    if settings.wantsAlerts && settings.alertPermission != .allowed {
+                        Text(settings.alertPermission == .blocked
+                             ? "Alerts are paused. Allow StatJack notifications in System Settings."
+                             : "Alerts will start once notifications are allowed.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .padding(.bottom, 6)
+                    }
                     alertRow(
                         title: "CPU Alert",
                         subtitle: "Notify when CPU exceeds threshold",
@@ -154,7 +162,7 @@ struct SettingsView: View {
 
                     alertRow(
                         title: "Disk Alert",
-                        subtitle: "Notify when disk usage reaches threshold",
+                        subtitle: "Based on used space, including purgeable files",
                         icon: AppIcons.disk,
                         isOn: $settings.diskAlertEnabled,
                         threshold: $settings.diskAlertThreshold
@@ -250,14 +258,14 @@ struct SettingsView: View {
             Text("Checking for updates...")
                 .font(.system(size: 10))
                 .foregroundStyle(.tertiary)
+        } else if let error = updater.lastError {
+            Text(error)
+                .font(.system(size: 10))
+                .foregroundStyle(.red)
         } else if updater.updateAvailable, let latest = updater.latestVersion {
             Text("Version \(latest) available")
                 .font(.system(size: 10))
                 .foregroundStyle(.orange)
-        } else if updater.lastError != nil {
-            Text("Update check failed")
-                .font(.system(size: 10))
-                .foregroundStyle(.red)
         } else if updater.isUpToDate && updater.lastCheckCompletedAt != nil {
             Text("Up to date")
                 .font(.system(size: 10))

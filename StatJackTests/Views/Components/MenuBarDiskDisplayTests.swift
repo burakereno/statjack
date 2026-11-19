@@ -45,7 +45,7 @@ struct MenuBarDiskDisplayTests {
             cpu: "",
             ram: "",
             disk: "71%",
-            diskFree: Formatters.menuBarDiskFreeSpace(79_564_269_158),
+            diskFree: Formatters.menuBarDiskFreeSpace(74_100_000_000),
             net: "",
             gpu: "",
             temp: ""

@@ -8,24 +8,30 @@ struct DiskView: View {
 
     var body: some View {
         MetricCardView(title: "Disk", systemImage: AppIcons.disk) {
-            VStack(alignment: .leading, spacing: 6) {
-                HStack(alignment: .firstTextBaseline, spacing: 2) {
-                    Text(Formatters.formatBytesCompact(usage.used))
-                        .font(.system(size: 18, weight: .bold, design: .monospaced))
-                        .foregroundStyle(AppColors.usageColor(for: usage.usedPercentage))
-                        .contentTransition(.numericText())
-                    Text("/ \(Formatters.formatBytesCompact(usage.total))")
-                        .font(.system(size: 10, weight: .medium, design: .monospaced))
-                        .foregroundStyle(.secondary)
-                }
+            if usage.total > 0 {
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(alignment: .firstTextBaseline, spacing: 2) {
+                        Text(Formatters.formatDiskCapacity(usage.used))
+                            .font(.system(size: 18, weight: .bold, design: .monospaced))
+                            .foregroundStyle(AppColors.usageColor(for: usage.usedPercentage))
+                            .contentTransition(.numericText())
+                        Text("/ \(Formatters.formatDiskCapacity(usage.total))")
+                            .font(.system(size: 10, weight: .medium, design: .monospaced))
+                            .foregroundStyle(.secondary)
+                    }
 
-                UsageBarView(percentage: usage.usedPercentage, height: 7)
+                    UsageBarView(percentage: usage.usedPercentage, height: 7)
 
-                HStack(spacing: 12) {
-                    diskLegend("USED", value: Formatters.formatBytesCompact(usage.used), color: .orange)
-                    diskLegend("FREE", value: Formatters.formatBytesCompact(usage.available), color: .green)
-                    Spacer()
+                    HStack(spacing: 12) {
+                        diskLegend("USED", value: Formatters.formatDiskCapacity(usage.used), color: .orange)
+                        diskLegend("FREE", value: Formatters.formatDiskCapacity(usage.available), color: .green)
+                        Spacer()
+                    }
                 }
+            } else {
+                Text("Disk space unavailable")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
         }
     }

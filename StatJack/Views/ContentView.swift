@@ -305,7 +305,7 @@ private struct SummaryRibbonView: View {
             SummaryMetric(
                 id: "disk",
                 label: "DISK",
-                value: "\(Int(diskUsage))%",
+                value: monitor.diskMonitor.diskUsage.total > 0 ? "\(Int(diskUsage))%" : "--",
                 systemImage: AppIcons.disk,
                 color: AppColors.usageColor(for: diskUsage)
             ),

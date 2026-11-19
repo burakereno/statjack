@@ -9,14 +9,14 @@ final class UpdateChecker {
 
     private static let owner = "burakereno"
     private static let repo = "statjack"
-    private static let assetName = "StatJack.dmg"
+    nonisolated private static let assetName = "StatJack.dmg"
     private static let manifestName = "StatJack.dmg.update.json"
     private static let productionBundleIdentifier = "com.statjack.app"
     private static let appBundleName = "StatJack.app"
     private static let executableName = "StatJack"
     private static let checkInterval: TimeInterval = 2 * 60 * 60
     private static let minimumManualCheckInterval: TimeInterval = 30 * 60
-    private static let minimumVisibleCheckDuration: UInt64 = 500_000_000
+    private var lastCheckInstant: ContinuousClock.Instant?
 
     private(set) var latestVersion: String?
     private(set) var downloadURL: URL?
@@ -48,11 +48,13 @@ final class UpdateChecker {
 
     private var isProductionBuild: Bool {
         Bundle.main.bundleIdentifier == Self.productionBundleIdentifier
+            && Bundle.main.object(forInfoDictionaryKey: "StatJackDistribution") as? Bool == true
     }
 
     private init() {}
 
     func start() {
+        guard isProductionBuild else { return }
         timer?.invalidate()
         Task { @MainActor in
             await UpdateChecker.shared.checkForUpdates(force: false, reportsErrors: false)
@@ -72,21 +74,22 @@ final class UpdateChecker {
     }
 
     func checkForUpdates(force: Bool = false) async {
-        await checkForUpdates(force: force, reportsErrors: true)
+        await checkForUpdates(force: force, reportsErrors: force)
     }
 
     private func checkForUpdates(force: Bool, reportsErrors: Bool) async {
-        guard !isChecking else { return }
+        guard isProductionBuild, !isChecking else { return }
 
-        let now = Date()
+        let start = ContinuousClock.now
         if !force,
-           let lastCheckedAt,
-           now.timeIntervalSince(lastCheckedAt) < Self.minimumManualCheckInterval
+           let lastCheckInstant,
+           lastCheckInstant.duration(to: start) < .seconds(Self.minimumManualCheckInterval)
         {
             return
         }
 
-        lastCheckedAt = now
+        lastCheckedAt = Date()
+        lastCheckInstant = start
         isChecking = true
         if reportsErrors {
             lastError = nil
@@ -104,11 +107,7 @@ final class UpdateChecker {
             }
         }
 
-        let elapsed = Date().timeIntervalSince(now)
-        if elapsed < 0.5 {
-            let remaining = Self.minimumVisibleCheckDuration - UInt64(elapsed * 1_000_000_000)
-            try? await Task.sleep(nanoseconds: remaining)
-        }
+        try? await ContinuousClock().sleep(until: start.advanced(by: .milliseconds(500)))
 
         lastCheckCompletedAt = Date()
         isChecking = false
@@ -120,6 +119,10 @@ final class UpdateChecker {
             return
         }
 
+        guard Bundle.main.bundlePath.hasPrefix("/Applications/") else {
+            lastError = UpdateError.notInstalled.localizedDescription
+            return
+        }
         guard !isDownloading else { return }
 
         guard let downloadURL, let manifestURL, let latestVersion else {
@@ -132,41 +135,29 @@ final class UpdateChecker {
         lastError = nil
 
         let task = URLSession.shared.downloadTask(with: downloadURL) { [weak self] tmpURL, response, error in
+            // URLSession owns tmpURL only until this callback returns.
+            let retained = Result { try Self.retainDownload(at: tmpURL, response: response, error: error) }
             Task { @MainActor in
-                guard let self else { return }
+                guard let self else {
+                    if case .success(let file) = retained {
+                        try? FileManager.default.removeItem(at: file.deletingLastPathComponent())
+                    }
+                    return
+                }
                 defer {
                     self.isDownloading = false
                     self.downloadProgress = 0
                 }
 
-                if let error {
+                let destination: URL
+                do {
+                    destination = try retained.get()
+                } catch {
                     self.lastError = error.localizedDescription
                     return
                 }
 
-                guard let tmpURL else {
-                    self.lastError = "Download failed"
-                    return
-                }
-
-                guard let httpResponse = response as? HTTPURLResponse,
-                      (200..<300).contains(httpResponse.statusCode)
-                else {
-                    self.lastError = UpdateError.badResponse.localizedDescription
-                    return
-                }
-
-                let workDirectory = FileManager.default.temporaryDirectory
-                    .appendingPathComponent("statjack-update-\(UUID().uuidString)", isDirectory: true)
-                let destination = workDirectory.appendingPathComponent(Self.assetName)
-
                 do {
-                    try FileManager.default.createDirectory(
-                        at: workDirectory,
-                        withIntermediateDirectories: false,
-                        attributes: [.posixPermissions: 0o700]
-                    )
-                    try FileManager.default.moveItem(at: tmpURL, to: destination)
                     let manifest = try await Self.fetchManifest(at: manifestURL)
                     let assetName = Self.assetName
                     let bundleIdentifier = Self.productionBundleIdentifier
@@ -179,13 +170,13 @@ final class UpdateChecker {
                             expectedBundleIdentifier: bundleIdentifier
                         )
                     }.value
-                    self.installUpdate(
+                    try self.installUpdate(
                         dmgURL: destination,
                         expectedVersion: latestVersion,
                         expectedSHA256: manifest.sha256.lowercased()
                     )
                 } catch {
-                    try? FileManager.default.removeItem(at: workDirectory)
+                    try? FileManager.default.removeItem(at: destination.deletingLastPathComponent())
                     self.lastError = error.localizedDescription
                 }
             }
@@ -199,27 +190,31 @@ final class UpdateChecker {
         task.resume()
     }
 
-    private func installUpdate(dmgURL: URL, expectedVersion: String, expectedSHA256: String) {
-        let currentBundle = URL(fileURLWithPath: Bundle.main.bundlePath)
-        let targetBundle = currentBundle.path.hasPrefix("/Applications/")
-            ? currentBundle
-            : URL(fileURLWithPath: "/Applications/\(Self.appBundleName)")
-
+    nonisolated static func retainDownload(at url: URL?, response: URLResponse?, error: Error?) throws -> URL {
+        if let error { throw error }
+        guard let url, let http = response as? HTTPURLResponse,
+              (200..<300).contains(http.statusCode) else { throw UpdateError.badResponse }
+        let fm = FileManager.default
+        let directory = fm.temporaryDirectory.appendingPathComponent("statjack-update-\(UUID().uuidString)", isDirectory: true)
+        try fm.createDirectory(at: directory, withIntermediateDirectories: false, attributes: [.posixPermissions: 0o700])
         do {
-            try UpdateSecurity.launchInstaller(
-                parentPID: ProcessInfo.processInfo.processIdentifier,
-                dmgURL: dmgURL,
-                targetURL: targetBundle,
-                expectedBundleIdentifier: Self.productionBundleIdentifier,
-                expectedVersion: expectedVersion,
-                appBundleName: Self.appBundleName,
-                executableName: Self.executableName,
-                expectedSHA256: expectedSHA256
-            )
+            let destination = directory.appendingPathComponent(assetName)
+            try fm.moveItem(at: url, to: destination)
+            return destination
         } catch {
-            lastError = "Could not launch installer: \(error.localizedDescription)"
-            return
+            try? fm.removeItem(at: directory)
+            throw error
         }
+    }
+
+    private func installUpdate(dmgURL: URL, expectedVersion: String, expectedSHA256: String) throws {
+        let currentBundle = URL(fileURLWithPath: Bundle.main.bundlePath)
+        guard currentBundle.path.hasPrefix("/Applications/") else { throw UpdateError.notInstalled }
+        try UpdateSecurity.launchInstaller(
+            parentPID: ProcessInfo.processInfo.processIdentifier, dmgURL: dmgURL, targetURL: currentBundle,
+            expectedBundleIdentifier: Self.productionBundleIdentifier, expectedVersion: expectedVersion,
+            appBundleName: Self.appBundleName, executableName: Self.executableName, expectedSHA256: expectedSHA256
+        )
 
         Task { @MainActor in
             try? await Task.sleep(nanoseconds: 300_000_000)
@@ -266,8 +261,10 @@ final class UpdateChecker {
     }
 
     static func releaseInfo(fromResolvedLatestURL url: URL) throws -> UpdateReleaseInfo {
-        let tag = url.lastPathComponent.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard tag != "latest" else {
+        let path = url.pathComponents
+        guard url.scheme == "https", url.host == "github.com", path.count == 6,
+              Array(path.prefix(5)) == ["/", owner, repo, "releases", "tag"],
+              let tag = path.last, tag.range(of: #"^v?[0-9]+\.[0-9]+\.[0-9]+$"#, options: .regularExpression) != nil else {
             throw UpdateError.missingVersion
         }
 
@@ -325,7 +322,8 @@ final class UpdateChecker {
     }
 }
 
-enum UpdateError: LocalizedError {
+enum UpdateError: LocalizedError, Equatable {
+    case notInstalled
     case badResponse
     case badStatus(Int)
     case missingAsset(String)
@@ -334,6 +332,8 @@ enum UpdateError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
+        case .notInstalled:
+            return "Move StatJack to Applications before updating."
         case .badResponse:
             return "GitHub returned an invalid response"
         case .badStatus(let statusCode):

@@ -2,7 +2,7 @@ import Foundation
 import Darwin
 import Observation
 
-/// Monitors system-wide network throughput using getifaddrs (public API)
+/// Monitors system-wide network throughput using 64-bit routing interface statistics
 @Observable
 @MainActor
 final class NetworkMonitor {
@@ -12,84 +12,67 @@ final class NetworkMonitor {
         totalUploaded: 0, totalDownloaded: 0
     )
 
-    /// Previous snapshot for delta calculation
     @ObservationIgnored
-    private var previousSnapshot: (bytesIn: UInt64, bytesOut: UInt64, timestamp: TimeInterval)?
-
-    /// First usable counters in this process, for session totals.
-    @ObservationIgnored
-    private var baselineSnapshot: (bytesIn: UInt64, bytesOut: UInt64)?
-
-    // MARK: - Update
-
-    nonisolated static func sample() -> NetworkSample {
-        let (totalIn, totalOut) = getInterfaceBytes()
-        return NetworkSample(
-            bytesIn: totalIn,
-            bytesOut: totalOut,
-            timestamp: CFAbsoluteTimeGetCurrent()
-        )
-    }
+    private var previous: NetworkSample?
 
     func apply(_ sample: NetworkSample) {
-        if let prev = previousSnapshot {
-            let deltaIn = sample.bytesIn >= prev.bytesIn ? sample.bytesIn - prev.bytesIn : 0
-            let deltaOut = sample.bytesOut >= prev.bytesOut ? sample.bytesOut - prev.bytesOut : 0
-            let deltaTime = sample.timestamp - prev.timestamp
-            let baseline = baselineSnapshot ?? (prev.bytesIn, prev.bytesOut)
-            baselineSnapshot = baseline
-
-            if deltaTime > 0 {
-                networkUsage = NetworkUsage(
-                    uploadSpeed: Double(deltaOut) / deltaTime,
-                    downloadSpeed: Double(deltaIn) / deltaTime,
-                    totalUploaded: sample.bytesOut >= baseline.bytesOut ? sample.bytesOut - baseline.bytesOut : 0,
-                    totalDownloaded: sample.bytesIn >= baseline.bytesIn ? sample.bytesIn - baseline.bytesIn : 0
-                )
+        if let previous {
+            let elapsed = sample.timestamp - previous.timestamp
+            guard elapsed > 0 else { return }
+            var received: UInt64 = 0, sent: UInt64 = 0
+            for (id, current) in sample.interfaces {
+                guard let old = previous.interfaces[id] else { continue }
+                if current.bytesIn >= old.bytesIn { received += current.bytesIn - old.bytesIn }
+                if current.bytesOut >= old.bytesOut { sent += current.bytesOut - old.bytesOut }
             }
-        } else {
-            baselineSnapshot = (sample.bytesIn, sample.bytesOut)
+            networkUsage = NetworkUsage(
+                uploadSpeed: Double(sent) / elapsed, downloadSpeed: Double(received) / elapsed,
+                totalUploaded: networkUsage.totalUploaded + sent,
+                totalDownloaded: networkUsage.totalDownloaded + received
+            )
         }
-
-        previousSnapshot = (sample.bytesIn, sample.bytesOut, sample.timestamp)
+        previous = sample
     }
 
-    // MARK: - getifaddrs
-
-    /// Returns total (bytesIn, bytesOut) across all non-loopback interfaces
-    nonisolated private static func getInterfaceBytes() -> (UInt64, UInt64) {
-        var totalIn: UInt64 = 0
-        var totalOut: UInt64 = 0
-
-        var ifaddr: UnsafeMutablePointer<ifaddrs>?
-        guard getifaddrs(&ifaddr) == 0 else { return (0, 0) }
-        defer { freeifaddrs(ifaddr) }
-
-        var ptr = ifaddr
-        while let current = ptr {
-            let addr = current.pointee
-
-            if let sa = addr.ifa_addr, sa.pointee.sa_family == UInt8(AF_LINK) {
-                let name = String(cString: addr.ifa_name)
-                let flags = Int32(addr.ifa_flags)
-                let isUsable = (flags & IFF_UP) != 0
-                    && (flags & IFF_RUNNING) != 0
-                    && (flags & IFF_LOOPBACK) == 0
-                    && !name.hasPrefix("awdl")
-                    && !name.hasPrefix("llw")
-                    && !name.hasPrefix("bridge")
-                    && !name.hasPrefix("utun")
-
-                if isUsable, let data = addr.ifa_data {
-                    let networkData = data.assumingMemoryBound(to: if_data.self)
-                    totalIn += UInt64(networkData.pointee.ifi_ibytes)
-                    totalOut += UInt64(networkData.pointee.ifi_obytes)
-                }
+    nonisolated static func sample() -> NetworkSample? {
+        var mib: [Int32] = [CTL_NET, PF_ROUTE, 0, 0, NET_RT_IFLIST2, 0]
+        // The list can grow between the size query and the read.
+        for _ in 0..<2 {
+            var size = 0
+            guard sysctl(&mib, 6, nil, &size, nil, 0) == 0, size > 0 else { return nil }
+            var bytes = Data(count: size)
+            let status = bytes.withUnsafeMutableBytes { ptr in
+                sysctl(&mib, 6, ptr.baseAddress, &size, nil, 0)
             }
-
-            ptr = addr.ifa_next.flatMap { UnsafeMutablePointer($0) }
+            if status != 0 {
+                if errno == ENOMEM { continue }
+                return nil
+            }
+            return bytes.withUnsafeBytes { raw in
+                var offset = 0
+                var counters: [String: InterfaceCounters] = [:]
+                while offset < size {
+                    guard size - offset >= 4 else { return nil }
+                    let length = Int(raw.loadUnaligned(fromByteOffset: offset, as: UInt16.self))
+                    guard length >= 4, length <= size - offset else { return nil }
+                    defer { offset += length }
+                    guard raw[offset + 2] == RTM_VERSION, raw[offset + 3] == RTM_IFINFO2 else { continue }
+                    guard length >= MemoryLayout<if_msghdr2>.size else { return nil }
+                    let msg = raw.loadUnaligned(fromByteOffset: offset, as: if_msghdr2.self)
+                    let flags = msg.ifm_flags
+                    guard (flags & (IFF_UP | IFF_RUNNING)) == (IFF_UP | IFF_RUNNING),
+                          (flags & IFF_LOOPBACK) == 0 else { continue }
+                    var buffer = [CChar](repeating: 0, count: Int(IF_NAMESIZE))
+                    guard if_indextoname(UInt32(msg.ifm_index), &buffer) != nil else { continue }
+                    let name = String(cString: buffer)
+                    guard !["awdl", "llw", "bridge", "utun"].contains(where: name.hasPrefix) else { continue }
+                    counters["\(msg.ifm_index):\(name)"] = InterfaceCounters(
+                        bytesIn: msg.ifm_data.ifi_ibytes, bytesOut: msg.ifm_data.ifi_obytes
+                    )
+                }
+                return NetworkSample(interfaces: counters, timestamp: ProcessInfo.processInfo.systemUptime)
+            }
         }
-
-        return (totalIn, totalOut)
+        return nil
     }
 }
